@@ -117,7 +117,7 @@ export default function ProductDetailPage() {
             {reviews.length ? (
               reviews.map((review) => (
                 <div key={review.reviewId} className="review-item">
-                  <strong>用户 #{review.userId}</strong>
+                  <strong>用户评价</strong>
                   <span>评分 {review.rating}/5</span>
                   <p>{review.comment || "未填写评论内容"}</p>
                 </div>

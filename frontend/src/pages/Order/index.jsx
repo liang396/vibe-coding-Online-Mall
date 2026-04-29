@@ -16,7 +16,9 @@ const TEXT = {
   actionSuccess: "\u8ba2\u5355\u72b6\u6001\u5df2\u66f4\u65b0",
   noOrders: "\u6682\u65e0\u8ba2\u5355\u3002",
   selectHint: "\u8bf7\u5148\u9009\u62e9\u5de6\u4fa7\u8ba2\u5355\u67e5\u770b\u8be6\u60c5\u3002",
-  buyerId: "\u4e70\u5bb6 ID",
+  orderCard: "\u8ba2\u5355",
+  orderDetailTitle: "\u8ba2\u5355\u8be6\u60c5",
+  orderItem: "\u5546\u54c1",
   totalPrice: "\u603b\u91d1\u989d",
   status: "\u72b6\u6001",
   quantity: "\u6570\u91cf",
@@ -138,7 +140,7 @@ export default function OrderPage() {
                 className="order-summary"
                 onClick={() => handleSelect(order.orderId)}
               >
-                <strong>{`\u8ba2\u5355 #${order.orderId}`}</strong>
+                <strong>{TEXT.orderCard}</strong>
                 <span>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
                 <span>{formatCurrency(order.totalPrice)}</span>
               </button>
@@ -151,15 +153,14 @@ export default function OrderPage() {
         <div className="feature-panel">
           {selectedOrder ? (
             <div className="stack-md">
-              <h3>{`\u8ba2\u5355 #${selectedOrder.orderId}`}</h3>
-              <p>{`${TEXT.buyerId}: ${selectedOrder.buyerId}`}</p>
+              <h3>{TEXT.orderDetailTitle}</h3>
               <p>{`${TEXT.totalPrice}: ${formatCurrency(selectedOrder.totalPrice)}`}</p>
               <p>{`${TEXT.status}: ${ORDER_STATUS_LABELS[selectedOrder.status] || selectedOrder.status}`}</p>
               {renderActions()}
               <div className="review-list">
                 {selectedOrder.items.map((item) => (
                   <div key={item.productId} className="review-item">
-                    <strong>{`\u5546\u54c1 #${item.productId}`}</strong>
+                    <strong>{TEXT.orderItem}</strong>
                     <span>{`${TEXT.quantity} ${item.quantity}`}</span>
                     <span>{`${TEXT.price} ${formatCurrency(item.price)}`}</span>
                   </div>
