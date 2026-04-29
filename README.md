@@ -1,6 +1,6 @@
 # 二手商城 Vibe Coding 全栈开发提醒
 
-本文档是这个仓库的开发提醒文档。它不是泛泛的 AI 编程教程，而是结合当前项目的真实开发过程，总结一套适合本仓库的 Vibe Coding 全栈流程。
+本文档是这个仓库的开发提醒文档。它不是泛泛的 AI 编程教程，而是基于程序员鱼皮的vibe coding项目开发流程结合当前项目的真实开发过程，总结一套适合本仓库的 Vibe Coding 全栈流程。
 
 参考资料：
 - 鱼皮《Vibe Coding 项目开发流程》提出了 5 步主线：Research、PRD、Tech Design、AGENTS、Build。
