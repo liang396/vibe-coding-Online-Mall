@@ -17,9 +17,11 @@ import com.project.repository.OrderRepository;
 import com.project.repository.ProductRepository;
 import com.project.security.AuthenticatedUser;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,67 +34,84 @@ public class OrderService {
     private static final String STATUS_SHIPPED = "shipped";
     private static final String STATUS_COMPLETED = "completed";
     private static final String STATUS_CANCELLED = "cancelled";
+    private static final String ORDER_IDEMPOTENCY_PREFIX = "order:idempotency:";
+    private static final Duration ORDER_IDEMPOTENCY_TTL = Duration.ofMinutes(10);
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final UserService userService;
     private final ProductCacheService productCacheService;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Transactional
     public CreateOrderResponse create(CreateOrderRequest request, AuthenticatedUser currentUser) {
         ensureBuyerSelfOrAdmin(request.getBuyerId(), currentUser);
         userService.requireUser(request.getBuyerId());
 
-        BigDecimal totalPrice = BigDecimal.ZERO;
-        Integer sellerId = null;
-        List<Product> products = new ArrayList<>();
-        for (OrderItemRequest item : request.getItems()) {
-            Product product = productRepository.findById(item.getProductId());
-            if (product == null) {
-                throw new NotFoundException("Product not found: " + item.getProductId());
-            }
-            if (!"on_sale".equals(product.getStatus())) {
-                throw new BadRequestException("Product is not available: " + item.getProductId());
-            }
-            if (product.getStock() < item.getQuantity()) {
-                throw new BadRequestException("Insufficient stock for product: " + item.getProductId());
-            }
-            if (sellerId == null) {
-                sellerId = product.getSellerId();
-            } else if (!sellerId.equals(product.getSellerId())) {
-                throw new BadRequestException("当前暂不支持不同卖家的商品合并下单，请按卖家分别提交订单");
-            }
-            totalPrice = totalPrice.add(product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
-            products.add(product);
+        String idempotencyKey = buildOrderIdempotencyKey(request.getBuyerId(), request.getIdempotencyKey());
+        Integer existingOrderId = readIdempotentOrderId(idempotencyKey);
+        if (existingOrderId != null) {
+            return new CreateOrderResponse(true, existingOrderId);
+        }
+        if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(idempotencyKey, "PENDING", ORDER_IDEMPOTENCY_TTL))) {
+            throw new BadRequestException("订单正在处理中，请勿重复提交");
         }
 
-        Order order = new Order();
-        order.setBuyerId(request.getBuyerId());
-        order.setTotalPrice(totalPrice);
-        order.setStatus(STATUS_PENDING);
-        orderRepository.insert(order);
-
-        for (int index = 0; index < request.getItems().size(); index++) {
-            OrderItemRequest item = request.getItems().get(index);
-            Product product = products.get(index);
-            int updated = productRepository.decreaseStock(item.getProductId(), item.getQuantity());
-            if (updated == 0) {
-                throw new BadRequestException("Failed to lock stock for product: " + item.getProductId());
+        try {
+            BigDecimal totalPrice = BigDecimal.ZERO;
+            Integer sellerId = null;
+            List<Product> products = new ArrayList<>();
+            for (OrderItemRequest item : request.getItems()) {
+                Product product = productRepository.findById(item.getProductId());
+                if (product == null) {
+                    throw new NotFoundException("Product not found: " + item.getProductId());
+                }
+                if (!"on_sale".equals(product.getStatus())) {
+                    throw new BadRequestException("Product is not available: " + item.getProductId());
+                }
+                if (product.getStock() < item.getQuantity()) {
+                    throw new BadRequestException("Insufficient stock for product: " + item.getProductId());
+                }
+                if (sellerId == null) {
+                    sellerId = product.getSellerId();
+                } else if (!sellerId.equals(product.getSellerId())) {
+                    throw new BadRequestException("当前暂不支持不同卖家的商品合并下单，请按卖家分别提交订单");
+                }
+                totalPrice = totalPrice.add(product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+                products.add(product);
             }
 
-            OrderItem orderItem = new OrderItem();
-            orderItem.setOrderId(order.getOrderId());
-            orderItem.setProductId(item.getProductId());
-            orderItem.setQuantity(item.getQuantity());
-            orderItem.setPrice(product.getPrice());
-            orderItemRepository.insert(orderItem);
+            Order order = new Order();
+            order.setBuyerId(request.getBuyerId());
+            order.setTotalPrice(totalPrice);
+            order.setStatus(STATUS_PENDING);
+            orderRepository.insert(order);
+
+            for (int index = 0; index < request.getItems().size(); index++) {
+                OrderItemRequest item = request.getItems().get(index);
+                Product product = products.get(index);
+                int updated = productRepository.decreaseStock(item.getProductId(), item.getQuantity());
+                if (updated == 0) {
+                    throw new BadRequestException("Failed to lock stock for product: " + item.getProductId());
+                }
+
+                OrderItem orderItem = new OrderItem();
+                orderItem.setOrderId(order.getOrderId());
+                orderItem.setProductId(item.getProductId());
+                orderItem.setQuantity(item.getQuantity());
+                orderItem.setPrice(product.getPrice());
+                orderItemRepository.insert(orderItem);
+            }
+
+            productCacheService.evictProducts(
+                    request.getItems().stream().map(OrderItemRequest::getProductId).toList());
+            rememberCreatedOrder(idempotencyKey, order.getOrderId());
+            return new CreateOrderResponse(true, order.getOrderId());
+        } catch (RuntimeException exception) {
+            stringRedisTemplate.delete(idempotencyKey);
+            throw exception;
         }
-
-        productCacheService.evictProducts(
-                request.getItems().stream().map(OrderItemRequest::getProductId).toList());
-
-        return new CreateOrderResponse(true, order.getOrderId());
     }
 
     public List<OrderSummaryResponse> list(Integer userId, String status, String scope, AuthenticatedUser currentUser) {
@@ -127,11 +146,20 @@ public class OrderService {
     }
 
     @Transactional
-    public void updateStatus(Integer orderId, String status, AuthenticatedUser currentUser) {
+    public void updateStatus(Integer orderId, String nextStatus, AuthenticatedUser currentUser) {
         Order order = requireOrder(orderId);
-        validateStatusTransition(order, status, currentUser);
-        orderRepository.updateStatus(orderId, status);
-        if (STATUS_CANCELLED.equals(status)) {
+        String currentStatus = order.getStatus();
+        validateStatusTransition(order, nextStatus, currentUser);
+
+        if (currentStatus.equals(nextStatus)) {
+            return;
+        }
+
+        int updated = orderRepository.updateStatusIfCurrentStatus(orderId, currentStatus, nextStatus);
+        if (updated == 0) {
+            throw new BadRequestException("订单状态已变更，请刷新后重试");
+        }
+        if (STATUS_CANCELLED.equals(nextStatus)) {
             restoreStock(orderId);
         }
     }
@@ -221,5 +249,21 @@ public class OrderService {
             productRepository.increaseStock(item.getProductId(), item.getQuantity());
         }
         productCacheService.evictProducts(items.stream().map(OrderItem::getProductId).toList());
+    }
+
+    private String buildOrderIdempotencyKey(Integer buyerId, String requestKey) {
+        return ORDER_IDEMPOTENCY_PREFIX + buyerId + ":" + requestKey.trim();
+    }
+
+    private Integer readIdempotentOrderId(String key) {
+        String value = stringRedisTemplate.opsForValue().get(key);
+        if (value == null || "PENDING".equals(value)) {
+            return null;
+        }
+        return Integer.valueOf(value);
+    }
+
+    private void rememberCreatedOrder(String key, Integer orderId) {
+        stringRedisTemplate.opsForValue().set(key, String.valueOf(orderId), ORDER_IDEMPOTENCY_TTL);
     }
 }

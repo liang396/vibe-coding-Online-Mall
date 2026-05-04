@@ -18,6 +18,13 @@ const TEXT = {
   submitFailed: "下单失败"
 };
 
+function createIdempotencyKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function CartPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -33,14 +40,21 @@ export default function CartPage() {
 
     setError("");
     setSubmitting(true);
+    const idempotencyKey = createIdempotencyKey();
     try {
-      const data = await createOrder({
-        buyer_id: user.userId,
-        items: items.map((item) => ({
-          product_id: item.productId,
-          quantity: item.quantity
-        }))
-      });
+      const data = await createOrder(
+        {
+          buyer_id: user.userId,
+          idempotency_key: idempotencyKey,
+          items: items.map((item) => ({
+            product_id: item.productId,
+            quantity: item.quantity
+          }))
+        },
+        {
+          idempotencyKey
+        }
+      );
       clearCart();
       navigate(`/orders?orderId=${data.orderId}`);
     } catch (checkoutError) {

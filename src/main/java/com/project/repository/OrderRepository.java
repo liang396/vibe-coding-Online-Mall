@@ -71,8 +71,12 @@ public interface OrderRepository {
 
     @Update("""
             UPDATE orders
-            SET status = #{status}
+            SET status = #{nextStatus}
             WHERE order_id = #{orderId}
+              AND status = #{currentStatus}
             """)
-    int updateStatus(@Param("orderId") Integer orderId, @Param("status") String status);
+    int updateStatusIfCurrentStatus(
+            @Param("orderId") Integer orderId,
+            @Param("currentStatus") String currentStatus,
+            @Param("nextStatus") String nextStatus);
 }

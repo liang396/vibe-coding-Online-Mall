@@ -1,8 +1,14 @@
 import client from "./client";
 import { compactParams } from "../utils/format";
 
-export async function createOrder(payload) {
-  const { data } = await client.post("/orders", payload);
+export async function createOrder(payload, options = {}) {
+  const { data } = await client.post("/orders", payload, {
+    headers: options.idempotencyKey
+      ? {
+          "X-Idempotency-Key": options.idempotencyKey
+        }
+      : undefined
+  });
   return data;
 }
 
