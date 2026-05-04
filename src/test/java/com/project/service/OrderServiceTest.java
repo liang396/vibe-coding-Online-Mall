@@ -3,8 +3,8 @@ package com.project.service;
 import com.project.dto.order.CreateOrderRequest;
 import com.project.dto.order.CreateOrderResponse;
 import com.project.dto.order.OrderDetailResponse;
-import com.project.dto.order.OrderSummaryResponse;
 import com.project.dto.order.OrderItemRequest;
+import com.project.dto.order.OrderSummaryResponse;
 import com.project.entity.Order;
 import com.project.entity.OrderItem;
 import com.project.entity.Product;
@@ -19,6 +19,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -56,6 +57,9 @@ class OrderServiceTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private SnowflakeOrderIdGenerator orderIdGenerator;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -66,7 +70,8 @@ class OrderServiceTest {
                 productRepository,
                 userService,
                 productCacheService,
-                stringRedisTemplate);
+                stringRedisTemplate,
+                orderIdGenerator);
     }
 
     @Test
@@ -97,7 +102,7 @@ class OrderServiceTest {
 
         CreateOrderResponse response = orderService.create(request, new AuthenticatedUser(1, "buyer", "buyer"));
 
-        assertEquals(88, response.getOrderId());
+        assertEquals(88L, response.getOrderId());
         verify(orderRepository, never()).insert(any(Order.class));
     }
 
@@ -116,9 +121,29 @@ class OrderServiceTest {
     }
 
     @Test
+    void createUsesGeneratedSnowflakeOrderId() {
+        CreateOrderRequest request = createRequest("idem-4", item(101, 2));
+        Product product = product(101, 11, new BigDecimal("49.50"), 5, "on_sale");
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("order:idempotency:1:idem-4")).thenReturn(null);
+        when(valueOperations.setIfAbsent(eq("order:idempotency:1:idem-4"), eq("PENDING"), any())).thenReturn(true);
+        when(productRepository.findById(101)).thenReturn(product);
+        when(productRepository.decreaseStock(101, 2)).thenReturn(1);
+        when(orderIdGenerator.nextId()).thenReturn(9001002003004005L);
+
+        CreateOrderResponse response = orderService.create(request, new AuthenticatedUser(1, "buyer", "buyer"));
+
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).insert(orderCaptor.capture());
+        assertEquals(9001002003004005L, orderCaptor.getValue().getOrderId());
+        assertEquals(9001002003004005L, response.getOrderId());
+        verify(valueOperations).set(eq("order:idempotency:1:idem-4"), eq("9001002003004005"), any());
+    }
+
+    @Test
     void listIncludesCreatedAtForOrderNumberFormatting() {
         Order order = new Order();
-        order.setOrderId(501);
+        order.setOrderId(501L);
         order.setBuyerId(1);
         order.setTotalPrice(new BigDecimal("88.00"));
         order.setStatus("paid");
@@ -134,17 +159,17 @@ class OrderServiceTest {
     @Test
     void getDetailIncludesProductNames() {
         Order order = new Order();
-        order.setOrderId(600);
+        order.setOrderId(600L);
         order.setBuyerId(1);
         order.setTotalPrice(new BigDecimal("99.00"));
         order.setStatus("pending");
         order.setCreatedAt(LocalDateTime.of(2026, 5, 5, 18, 20));
-        when(orderRepository.findById(600)).thenReturn(order);
-        when(orderItemRepository.findByOrderId(600)).thenReturn(List.of(orderItem(101, "机械键盘", 2)));
+        when(orderRepository.findById(600L)).thenReturn(order);
+        when(orderItemRepository.findByOrderId(600L)).thenReturn(List.of(orderItem(101, "机械键盘", 2)));
 
-        OrderDetailResponse response = orderService.getDetail(600, new AuthenticatedUser(1, "buyer", "buyer"));
+        OrderDetailResponse response = orderService.getDetail(600L, new AuthenticatedUser(1, "buyer", "buyer"));
 
-        assertEquals(600, response.getOrderId());
+        assertEquals(600L, response.getOrderId());
         assertEquals("机械键盘", response.getItems().get(0).getProductName());
         assertEquals(2, response.getItems().get(0).getQuantity());
         assertEquals(LocalDateTime.of(2026, 5, 5, 18, 20), response.getCreatedAt());
@@ -153,14 +178,14 @@ class OrderServiceTest {
     @Test
     void updateStatusRestoresStockOnlyWhenCancellationTransitionSucceeds() {
         Order order = new Order();
-        order.setOrderId(200);
+        order.setOrderId(200L);
         order.setBuyerId(1);
         order.setStatus("pending");
-        when(orderRepository.findById(200)).thenReturn(order);
-        when(orderRepository.updateStatusIfCurrentStatus(200, "pending", "cancelled")).thenReturn(1);
-        when(orderItemRepository.findByOrderId(200)).thenReturn(List.of(orderItem(101, 2), orderItem(102, 1)));
+        when(orderRepository.findById(200L)).thenReturn(order);
+        when(orderRepository.updateStatusIfCurrentStatus(200L, "pending", "cancelled")).thenReturn(1);
+        when(orderItemRepository.findByOrderId(200L)).thenReturn(List.of(orderItem(101, 2), orderItem(102, 1)));
 
-        orderService.updateStatus(200, "cancelled", new AuthenticatedUser(1, "buyer", "buyer"));
+        orderService.updateStatus(200L, "cancelled", new AuthenticatedUser(1, "buyer", "buyer"));
 
         verify(productRepository).increaseStock(101, 2);
         verify(productRepository).increaseStock(102, 1);
@@ -170,12 +195,12 @@ class OrderServiceTest {
     @Test
     void updateStatusSkipsStockRestoreWhenOrderAlreadyCancelled() {
         Order order = new Order();
-        order.setOrderId(201);
+        order.setOrderId(201L);
         order.setBuyerId(1);
         order.setStatus("cancelled");
-        when(orderRepository.findById(201)).thenReturn(order);
+        when(orderRepository.findById(201L)).thenReturn(order);
 
-        orderService.updateStatus(201, "cancelled", new AuthenticatedUser(1, "buyer", "buyer"));
+        orderService.updateStatus(201L, "cancelled", new AuthenticatedUser(1, "buyer", "buyer"));
 
         verify(orderRepository, never()).updateStatusIfCurrentStatus(any(), any(), any());
         verify(orderItemRepository, never()).findByOrderId(any());
@@ -185,14 +210,14 @@ class OrderServiceTest {
     @Test
     void updateStatusThrowsWhenConcurrentTransitionAlreadyChangedOrder() {
         Order order = new Order();
-        order.setOrderId(202);
+        order.setOrderId(202L);
         order.setBuyerId(1);
         order.setStatus("pending");
-        when(orderRepository.findById(202)).thenReturn(order);
-        when(orderRepository.updateStatusIfCurrentStatus(202, "pending", "paid")).thenReturn(0);
+        when(orderRepository.findById(202L)).thenReturn(order);
+        when(orderRepository.updateStatusIfCurrentStatus(202L, "pending", "paid")).thenReturn(0);
 
         BadRequestException exception = assertThrows(BadRequestException.class,
-                () -> orderService.updateStatus(202, "paid", new AuthenticatedUser(1, "buyer", "buyer")));
+                () -> orderService.updateStatus(202L, "paid", new AuthenticatedUser(1, "buyer", "buyer")));
 
         assertEquals("订单状态已变更，请刷新后重试", exception.getMessage());
     }
@@ -200,25 +225,25 @@ class OrderServiceTest {
     @Test
     void sellerCannotShipMixedSellerOrder() {
         Order order = new Order();
-        order.setOrderId(300);
+        order.setOrderId(300L);
         order.setBuyerId(1);
         order.setStatus("paid");
-        when(orderRepository.findById(300)).thenReturn(order);
-        when(orderRepository.countSellerAccess(300, 11)).thenReturn(1);
-        when(orderRepository.countDistinctSellers(300)).thenReturn(2);
+        when(orderRepository.findById(300L)).thenReturn(order);
+        when(orderRepository.countSellerAccess(300L, 11)).thenReturn(1);
+        when(orderRepository.countDistinctSellers(300L)).thenReturn(2);
 
         BadRequestException exception = assertThrows(BadRequestException.class,
-                () -> orderService.updateStatus(300, "shipped", new AuthenticatedUser(11, "seller", "seller")));
+                () -> orderService.updateStatus(300L, "shipped", new AuthenticatedUser(11, "seller", "seller")));
 
         assertEquals("该订单包含多个卖家的商品，当前不支持卖家直接发货", exception.getMessage());
-        verify(orderRepository, never()).updateStatusIfCurrentStatus(300, "paid", "shipped");
+        verify(orderRepository, never()).updateStatusIfCurrentStatus(300L, "paid", "shipped");
     }
 
     @Test
     void restoreStockForTimeoutReleasesInventory() {
-        when(orderItemRepository.findByOrderId(401)).thenReturn(List.of(orderItem(101, 2), orderItem(102, 3)));
+        when(orderItemRepository.findByOrderId(401L)).thenReturn(List.of(orderItem(101, 2), orderItem(102, 3)));
 
-        orderService.restoreStockForTimeout(401);
+        orderService.restoreStockForTimeout(401L);
 
         verify(productRepository).increaseStock(101, 2);
         verify(productRepository).increaseStock(102, 3);

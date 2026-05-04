@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class Order {
 
-    private Integer orderId;
+    private Long orderId;
     private Integer buyerId;
     private BigDecimal totalPrice;
     private String status;

@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -14,10 +13,9 @@ import org.apache.ibatis.annotations.Update;
 public interface OrderRepository {
 
     @Insert("""
-            INSERT INTO orders (buyer_id, total_price, status)
-            VALUES (#{buyerId}, #{totalPrice}, #{status})
+            INSERT INTO orders (order_id, buyer_id, total_price, status)
+            VALUES (#{orderId}, #{buyerId}, #{totalPrice}, #{status})
             """)
-    @Options(useGeneratedKeys = true, keyProperty = "orderId", keyColumn = "order_id")
     int insert(Order order);
 
     @Select("""
@@ -25,7 +23,7 @@ public interface OrderRepository {
             FROM orders
             WHERE order_id = #{orderId}
             """)
-    Order findById(Integer orderId);
+    Order findById(Long orderId);
 
     @Select("""
             <script>
@@ -70,7 +68,7 @@ public interface OrderRepository {
             WHERE o.order_id = #{orderId}
               AND p.seller_id = #{sellerId}
             """)
-    int countSellerAccess(@Param("orderId") Integer orderId, @Param("sellerId") Integer sellerId);
+    int countSellerAccess(@Param("orderId") Long orderId, @Param("sellerId") Integer sellerId);
 
     @Select("""
             SELECT COUNT(DISTINCT p.seller_id)
@@ -78,7 +76,7 @@ public interface OrderRepository {
             JOIN products p ON p.product_id = oi.product_id
             WHERE oi.order_id = #{orderId}
             """)
-    int countDistinctSellers(@Param("orderId") Integer orderId);
+    int countDistinctSellers(@Param("orderId") Long orderId);
 
     @Update("""
             UPDATE orders
@@ -87,7 +85,7 @@ public interface OrderRepository {
               AND status = #{currentStatus}
             """)
     int updateStatusIfCurrentStatus(
-            @Param("orderId") Integer orderId,
+            @Param("orderId") Long orderId,
             @Param("currentStatus") String currentStatus,
             @Param("nextStatus") String nextStatus);
 }

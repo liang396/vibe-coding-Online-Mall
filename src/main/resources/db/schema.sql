@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS products (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS orders (
-    order_id INT NOT NULL AUTO_INCREMENT,
+    order_id BIGINT NOT NULL,
     buyer_id INT NOT NULL,
     total_price DECIMAL(10, 2) NOT NULL,
     status ENUM('pending', 'paid', 'shipped', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE TABLE IF NOT EXISTS order_items (
     order_item_id INT NOT NULL AUTO_INCREMENT,
-    order_id INT NOT NULL,
+    order_id BIGINT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
@@ -79,6 +79,42 @@ CREATE TABLE IF NOT EXISTS order_items (
         FOREIGN KEY (product_id) REFERENCES products (product_id)
         ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET @orders_order_id_sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'orders'
+              AND column_name = 'order_id'
+              AND data_type <> 'bigint'
+        ),
+        'ALTER TABLE orders MODIFY COLUMN order_id BIGINT NOT NULL',
+        'SELECT 1'
+    )
+);
+PREPARE orders_order_id_stmt FROM @orders_order_id_sql;
+EXECUTE orders_order_id_stmt;
+DEALLOCATE PREPARE orders_order_id_stmt;
+
+SET @order_items_order_id_sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'order_items'
+              AND column_name = 'order_id'
+              AND data_type <> 'bigint'
+        ),
+        'ALTER TABLE order_items MODIFY COLUMN order_id BIGINT NOT NULL',
+        'SELECT 1'
+    )
+);
+PREPARE order_items_order_id_stmt FROM @order_items_order_id_sql;
+EXECUTE order_items_order_id_stmt;
+DEALLOCATE PREPARE order_items_order_id_stmt;
 
 CREATE TABLE IF NOT EXISTS reviews (
     review_id INT NOT NULL AUTO_INCREMENT,

@@ -108,9 +108,9 @@ export default function OrderPage() {
       });
       setOrders(data);
 
-      const targetOrderId = preferredOrderId ? Number(preferredOrderId) : data[0]?.orderId;
-      if (targetOrderId) {
-        await handleSelect(targetOrderId);
+      const targetOrderId = preferredOrderId ?? data[0]?.orderId;
+      if (targetOrderId !== undefined && targetOrderId !== null && targetOrderId !== "") {
+        await handleSelect(String(targetOrderId));
       } else {
         setSelectedOrder(null);
       }
@@ -205,8 +205,8 @@ export default function OrderPage() {
             orders.map((order) => (
               <button
                 key={order.orderId}
-                className={`order-summary${selectedOrder?.orderId === order.orderId ? " active" : ""}`}
-                onClick={() => handleSelect(order.orderId)}
+                className={`order-summary${String(selectedOrder?.orderId) === String(order.orderId) ? " active" : ""}`}
+                onClick={() => handleSelect(String(order.orderId))}
               >
                 <strong>{formatOrderNo(order.orderId, order.createdAt)}</strong>
                 <span>{ORDER_STATUS_LABELS[order.status] || order.status}</span>

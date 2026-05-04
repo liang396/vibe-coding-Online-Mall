@@ -47,12 +47,12 @@ public class OrderController {
     }
 
     @GetMapping("/{orderId}")
-    public OrderDetailResponse detail(@PathVariable Integer orderId) {
+    public OrderDetailResponse detail(@PathVariable Long orderId) {
         return orderService.getDetail(orderId, SecurityUtils.getCurrentUser());
     }
 
     @PutMapping("/{orderId}/status")
-    public ApiSuccessResponse updateStatus(@PathVariable Integer orderId, @Valid @RequestBody UpdateOrderStatusRequest request) {
+    public ApiSuccessResponse updateStatus(@PathVariable Long orderId, @Valid @RequestBody UpdateOrderStatusRequest request) {
         orderService.updateStatus(orderId, request.getStatus(), SecurityUtils.getCurrentUser());
         return ApiSuccessResponse.ok();
     }

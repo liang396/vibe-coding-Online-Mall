@@ -43,6 +43,7 @@ public class OrderService {
     private final UserService userService;
     private final ProductCacheService productCacheService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final SnowflakeOrderIdGenerator orderIdGenerator;
 
     @Transactional
     public CreateOrderResponse create(CreateOrderRequest request, AuthenticatedUser currentUser) {
@@ -50,7 +51,7 @@ public class OrderService {
         userService.requireUser(request.getBuyerId());
 
         String idempotencyKey = buildOrderIdempotencyKey(request.getBuyerId(), request.getIdempotencyKey());
-        Integer existingOrderId = readIdempotentOrderId(idempotencyKey);
+        Long existingOrderId = readIdempotentOrderId(idempotencyKey);
         if (existingOrderId != null) {
             return new CreateOrderResponse(true, existingOrderId);
         }
@@ -83,6 +84,7 @@ public class OrderService {
             }
 
             Order order = new Order();
+            order.setOrderId(orderIdGenerator.nextId());
             order.setBuyerId(request.getBuyerId());
             order.setTotalPrice(totalPrice);
             order.setStatus(STATUS_PENDING);
@@ -139,7 +141,7 @@ public class OrderService {
                 .toList();
     }
 
-    public OrderDetailResponse getDetail(Integer orderId, AuthenticatedUser currentUser) {
+    public OrderDetailResponse getDetail(Long orderId, AuthenticatedUser currentUser) {
         Order order = requireOrder(orderId);
         ensureOrderAccessible(order, currentUser);
         List<OrderItemResponse> items = orderItemRepository.findByOrderId(orderId)
@@ -156,7 +158,7 @@ public class OrderService {
     }
 
     @Transactional
-    public void updateStatus(Integer orderId, String nextStatus, AuthenticatedUser currentUser) {
+    public void updateStatus(Long orderId, String nextStatus, AuthenticatedUser currentUser) {
         Order order = requireOrder(orderId);
         String currentStatus = order.getStatus();
         validateStatusTransition(order, nextStatus, currentUser);
@@ -175,11 +177,11 @@ public class OrderService {
     }
 
     @Transactional
-    public void restoreStockForTimeout(Integer orderId) {
+    public void restoreStockForTimeout(Long orderId) {
         restoreStock(orderId);
     }
 
-    private Order requireOrder(Integer orderId) {
+    private Order requireOrder(Long orderId) {
         Order order = orderRepository.findById(orderId);
         if (order == null) {
             throw new NotFoundException("Order not found");
@@ -258,7 +260,7 @@ public class OrderService {
         }
     }
 
-    private void restoreStock(Integer orderId) {
+    private void restoreStock(Long orderId) {
         List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
         for (OrderItem item : items) {
             productRepository.increaseStock(item.getProductId(), item.getQuantity());
@@ -270,15 +272,15 @@ public class OrderService {
         return ORDER_IDEMPOTENCY_PREFIX + buyerId + ":" + requestKey.trim();
     }
 
-    private Integer readIdempotentOrderId(String key) {
+    private Long readIdempotentOrderId(String key) {
         String value = stringRedisTemplate.opsForValue().get(key);
         if (value == null || "PENDING".equals(value)) {
             return null;
         }
-        return Integer.valueOf(value);
+        return Long.valueOf(value);
     }
 
-    private void rememberCreatedOrder(String key, Integer orderId) {
+    private void rememberCreatedOrder(String key, Long orderId) {
         stringRedisTemplate.opsForValue().set(key, String.valueOf(orderId), ORDER_IDEMPOTENCY_TTL);
     }
 }

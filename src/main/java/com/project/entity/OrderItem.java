@@ -7,7 +7,7 @@ import lombok.Data;
 public class OrderItem {
 
     private Integer orderItemId;
-    private Integer orderId;
+    private Long orderId;
     private Integer productId;
     private Integer quantity;
     private BigDecimal price;

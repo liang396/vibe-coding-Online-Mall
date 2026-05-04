@@ -29,5 +29,5 @@ public interface OrderItemRepository {
             WHERE oi.order_id = #{orderId}
             ORDER BY oi.order_item_id ASC
             """)
-    List<OrderItem> findByOrderId(Integer orderId);
+    List<OrderItem> findByOrderId(Long orderId);
 }

@@ -43,15 +43,15 @@ class OrderTimeoutServiceTest {
     @Test
     void autoCancelPendingOrdersCancelsExpiredOrders() {
         Order expiredOrder = new Order();
-        expiredOrder.setOrderId(501);
+        expiredOrder.setOrderId(501L);
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.setIfAbsent(eq("order:timeout:scanner:lock"), eq("1"), any())).thenReturn(true);
         when(orderRepository.findPendingOrdersCreatedBefore(any(LocalDateTime.class))).thenReturn(List.of(expiredOrder));
-        when(orderRepository.updateStatusIfCurrentStatus(501, "pending", "cancelled")).thenReturn(1);
+        when(orderRepository.updateStatusIfCurrentStatus(501L, "pending", "cancelled")).thenReturn(1);
 
         orderTimeoutService.autoCancelPendingOrders();
 
-        verify(orderService).restoreStockForTimeout(501);
+        verify(orderService).restoreStockForTimeout(501L);
         verify(stringRedisTemplate).delete("order:timeout:scanner:lock");
     }
 
