@@ -17,6 +17,7 @@ import com.project.repository.OrderRepository;
 import com.project.repository.ProductRepository;
 import com.project.security.AuthenticatedUser;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class OrderService {
     private static final String STATUS_PAID = "paid";
     private static final String STATUS_SHIPPED = "shipped";
     private static final String STATUS_COMPLETED = "completed";
+    private static final String STATUS_CANCELLED = "cancelled";
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -43,6 +45,8 @@ public class OrderService {
         userService.requireUser(request.getBuyerId());
 
         BigDecimal totalPrice = BigDecimal.ZERO;
+        Integer sellerId = null;
+        List<Product> products = new ArrayList<>();
         for (OrderItemRequest item : request.getItems()) {
             Product product = productRepository.findById(item.getProductId());
             if (product == null) {
@@ -54,7 +58,13 @@ public class OrderService {
             if (product.getStock() < item.getQuantity()) {
                 throw new BadRequestException("Insufficient stock for product: " + item.getProductId());
             }
+            if (sellerId == null) {
+                sellerId = product.getSellerId();
+            } else if (!sellerId.equals(product.getSellerId())) {
+                throw new BadRequestException("当前暂不支持不同卖家的商品合并下单，请按卖家分别提交订单");
+            }
             totalPrice = totalPrice.add(product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+            products.add(product);
         }
 
         Order order = new Order();
@@ -63,8 +73,9 @@ public class OrderService {
         order.setStatus(STATUS_PENDING);
         orderRepository.insert(order);
 
-        for (OrderItemRequest item : request.getItems()) {
-            Product product = productRepository.findById(item.getProductId());
+        for (int index = 0; index < request.getItems().size(); index++) {
+            OrderItemRequest item = request.getItems().get(index);
+            Product product = products.get(index);
             int updated = productRepository.decreaseStock(item.getProductId(), item.getQuantity());
             if (updated == 0) {
                 throw new BadRequestException("Failed to lock stock for product: " + item.getProductId());
@@ -115,10 +126,14 @@ public class OrderService {
         return new OrderDetailResponse(order.getOrderId(), order.getBuyerId(), order.getTotalPrice(), order.getStatus(), items);
     }
 
+    @Transactional
     public void updateStatus(Integer orderId, String status, AuthenticatedUser currentUser) {
         Order order = requireOrder(orderId);
         validateStatusTransition(order, status, currentUser);
         orderRepository.updateStatus(orderId, status);
+        if (STATUS_CANCELLED.equals(status)) {
+            restoreStock(orderId);
+        }
     }
 
     private Order requireOrder(Integer orderId) {
@@ -169,6 +184,9 @@ public class OrderService {
             if (orderRepository.countSellerAccess(order.getOrderId(), currentUser.getUserId()) == 0) {
                 throw new UnauthorizedException("No permission");
             }
+            if (orderRepository.countDistinctSellers(order.getOrderId()) > 1) {
+                throw new BadRequestException("该订单包含多个卖家的商品，当前不支持卖家直接发货");
+            }
             if (STATUS_PAID.equals(currentStatus) && STATUS_SHIPPED.equals(nextStatus)) {
                 return;
             }
@@ -176,22 +194,32 @@ public class OrderService {
         }
 
         ensureBuyerSelfOrAdmin(order.getBuyerId(), currentUser);
-        if (STATUS_PENDING.equals(currentStatus) && STATUS_PAID.equals(nextStatus)) {
+        if (STATUS_PENDING.equals(currentStatus)
+                && (STATUS_PAID.equals(nextStatus) || STATUS_CANCELLED.equals(nextStatus))) {
             return;
         }
         if (STATUS_SHIPPED.equals(currentStatus) && STATUS_COMPLETED.equals(nextStatus)) {
             return;
         }
-        throw new BadRequestException("Buyers can only pay pending orders or confirm receipt");
+        throw new BadRequestException("Buyers can only pay or cancel pending orders, or confirm receipt");
     }
 
     private void validateAdminTransition(String currentStatus, String nextStatus) {
         boolean allowed =
-                (STATUS_PENDING.equals(currentStatus) && STATUS_PAID.equals(nextStatus))
+                (STATUS_PENDING.equals(currentStatus)
+                                && (STATUS_PAID.equals(nextStatus) || STATUS_CANCELLED.equals(nextStatus)))
                         || (STATUS_PAID.equals(currentStatus) && STATUS_SHIPPED.equals(nextStatus))
                         || (STATUS_SHIPPED.equals(currentStatus) && STATUS_COMPLETED.equals(nextStatus));
         if (!allowed) {
             throw new BadRequestException("Invalid order status transition");
         }
+    }
+
+    private void restoreStock(Integer orderId) {
+        List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
+        for (OrderItem item : items) {
+            productRepository.increaseStock(item.getProductId(), item.getQuantity());
+        }
+        productCacheService.evictProducts(items.stream().map(OrderItem::getProductId).toList());
     }
 }

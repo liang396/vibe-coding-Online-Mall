@@ -1,48 +1,64 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { fetchProducts } from "../../api/productApi";
 import ProductCard from "../../components/ProductCard";
 import SectionTitle from "../../components/SectionTitle";
 import { CATEGORY_OPTIONS } from "../../utils/constants";
-import { getErrorMessage } from "../../utils/format";
+import { compactParams, getErrorMessage } from "../../utils/format";
+
+const PAGE_SIZE = 10;
+const REQUEST_SIZE = PAGE_SIZE + 1;
 
 const TEXT = {
-  eyebrow: "\u5546\u54c1\u4e2d\u5fc3",
-  title: "\u5546\u54c1\u5217\u8868",
-  description: "\u652f\u6301\u6309\u5173\u952e\u5b57\u548c\u5206\u7c7b\u68c0\u7d22\u5546\u54c1\u3002",
-  publish: "\u5356\u5bb6\u53d1\u5e03\u5546\u54c1",
-  keyword: "\u641c\u7d22\u5173\u952e\u5b57",
-  category: "\u9009\u62e9\u5206\u7c7b",
-  allCategories: "\u5168\u90e8\u5206\u7c7b",
-  search: "\u67e5\u8be2",
-  loadFailed: "\u5546\u54c1\u5217\u8868\u52a0\u8f7d\u5931\u8d25",
-  loading: "\u5546\u54c1\u52a0\u8f7d\u4e2d...",
-  empty: "\u6682\u65e0\u5546\u54c1\uff0c\u5148\u53bb\u5356\u5bb6\u4e2d\u5fc3\u53d1\u5e03\u4e00\u4e2a\u5427\u3002"
+  eyebrow: "商品中心",
+  title: "商品列表",
+  description: "支持按关键字和分类检索商品。",
+  publish: "卖家发布商品",
+  keyword: "搜索关键字",
+  category: "选择分类",
+  allCategories: "全部分类",
+  search: "查询",
+  loadFailed: "商品列表加载失败",
+  loading: "商品加载中...",
+  empty: "暂无商品，先去卖家中心发布一个吧。"
 };
 
+function buildFilters(searchParams) {
+  const page = Number(searchParams.get("page") || "1");
+  return {
+    category_id: searchParams.get("category_id") || "",
+    keyword: searchParams.get("keyword") || "",
+    page: Number.isFinite(page) && page > 0 ? page : 1
+  };
+}
+
 export default function ProductListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlFilters = useMemo(() => buildFilters(searchParams), [searchParams]);
+  const [formFilters, setFormFilters] = useState(urlFilters);
   const [products, setProducts] = useState([]);
-  const [filters, setFilters] = useState({
-    category_id: "",
-    keyword: "",
-    page: 1,
-    size: 10
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hasNextPage, setHasNextPage] = useState(false);
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    setFormFilters(urlFilters);
+  }, [urlFilters]);
 
-  const loadProducts = async (nextFilters = filters) => {
+  useEffect(() => {
+    void loadProducts(urlFilters);
+  }, [urlFilters]);
+
+  const loadProducts = async (nextFilters) => {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchProducts(nextFilters);
-      setProducts(data);
-      setHasNextPage(data.length === nextFilters.size);
+      const data = await fetchProducts({
+        ...nextFilters,
+        size: REQUEST_SIZE
+      });
+      setProducts(data.slice(0, PAGE_SIZE));
+      setHasNextPage(data.length > PAGE_SIZE);
     } catch (err) {
       setError(getErrorMessage(err, TEXT.loadFailed));
     } finally {
@@ -50,17 +66,29 @@ export default function ProductListPage() {
     }
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    const nextFilters = { ...filters, page: 1, size: 10 };
-    setFilters(nextFilters);
-    await loadProducts(nextFilters);
+  const updateSearch = (nextFilters) => {
+    setSearchParams(
+      compactParams({
+        keyword: nextFilters.keyword.trim(),
+        category_id: nextFilters.category_id,
+        page: String(nextFilters.page)
+      })
+    );
   };
 
-  const handlePageChange = async (page) => {
-    const nextFilters = { ...filters, page };
-    setFilters(nextFilters);
-    await loadProducts(nextFilters);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    updateSearch({
+      ...formFilters,
+      page: 1
+    });
+  };
+
+  const handlePageChange = (page) => {
+    updateSearch({
+      ...urlFilters,
+      page
+    });
   };
 
   return (
@@ -79,15 +107,15 @@ export default function ProductListPage() {
       <form className="filter-bar" onSubmit={handleSubmit}>
         <input
           placeholder={TEXT.keyword}
-          value={filters.keyword}
+          value={formFilters.keyword}
           onChange={(event) =>
-            setFilters((prev) => ({ ...prev, keyword: event.target.value }))
+            setFormFilters((prev) => ({ ...prev, keyword: event.target.value }))
           }
         />
         <select
-          value={filters.category_id}
+          value={formFilters.category_id}
           onChange={(event) =>
-            setFilters((prev) => ({ ...prev, category_id: event.target.value }))
+            setFormFilters((prev) => ({ ...prev, category_id: event.target.value }))
           }
         >
           <option value="">{TEXT.allCategories}</option>
@@ -118,17 +146,17 @@ export default function ProductListPage() {
             <button
               type="button"
               className="ghost-button"
-              disabled={filters.page <= 1 || loading}
-              onClick={() => handlePageChange(filters.page - 1)}
+              disabled={urlFilters.page <= 1 || loading}
+              onClick={() => handlePageChange(urlFilters.page - 1)}
             >
               上一页
             </button>
-            <span className="pagination-info">{`第 ${filters.page} 页`}</span>
+            <span className="pagination-info">{`第 ${urlFilters.page} 页`}</span>
             <button
               type="button"
               className="ghost-button"
               disabled={!hasNextPage || loading}
-              onClick={() => handlePageChange(filters.page + 1)}
+              onClick={() => handlePageChange(urlFilters.page + 1)}
             >
               下一页
             </button>

@@ -6,6 +6,11 @@ export async function fetchProducts(params = {}) {
   return data;
 }
 
+export async function fetchSellerProducts() {
+  const { data } = await client.get("/seller/products");
+  return data;
+}
+
 export async function fetchProduct(productId) {
   const { data } = await client.get(`/products/${productId}`);
   return data;

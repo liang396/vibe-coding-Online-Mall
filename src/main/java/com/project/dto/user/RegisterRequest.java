@@ -22,6 +22,6 @@ public class RegisterRequest {
     @Size(min = 6, max = 100)
     private String password;
 
-    @Pattern(regexp = "buyer|seller|admin", message = "role must be buyer, seller, or admin")
+    @Pattern(regexp = "buyer|seller", message = "role must be buyer or seller")
     private String role;
 }

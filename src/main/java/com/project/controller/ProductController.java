@@ -40,6 +40,11 @@ public class ProductController {
         return productService.list(categoryId, keyword, page, size);
     }
 
+    @GetMapping("/seller/products")
+    public List<ProductSummaryResponse> listSellerProducts() {
+        return productService.listBySeller(SecurityUtils.getCurrentUser());
+    }
+
     @GetMapping("/products/{productId}")
     public ProductDetailResponse detail(@PathVariable Integer productId) {
         return productService.getDetail(productId);

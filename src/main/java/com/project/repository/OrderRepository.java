@@ -61,6 +61,14 @@ public interface OrderRepository {
             """)
     int countSellerAccess(@Param("orderId") Integer orderId, @Param("sellerId") Integer sellerId);
 
+    @Select("""
+            SELECT COUNT(DISTINCT p.seller_id)
+            FROM order_items oi
+            JOIN products p ON p.product_id = oi.product_id
+            WHERE oi.order_id = #{orderId}
+            """)
+    int countDistinctSellers(@Param("orderId") Integer orderId);
+
     @Update("""
             UPDATE orders
             SET status = #{status}

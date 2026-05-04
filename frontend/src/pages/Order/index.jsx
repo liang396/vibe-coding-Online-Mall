@@ -7,25 +7,26 @@ import { ORDER_STATUS_LABELS } from "../../utils/labels";
 import { formatCurrency, getErrorMessage } from "../../utils/format";
 
 const TEXT = {
-  eyebrow: "\u8ba2\u5355\u4e2d\u5fc3",
-  buyerTitle: "\u6211\u7684\u8ba2\u5355",
-  sellerTitle: "\u5f85\u5904\u7406\u8ba2\u5355",
-  loadOrdersFailed: "\u8ba2\u5355\u52a0\u8f7d\u5931\u8d25",
-  loadDetailFailed: "\u8ba2\u5355\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25",
-  updateFailed: "\u66f4\u65b0\u8ba2\u5355\u72b6\u6001\u5931\u8d25",
-  actionSuccess: "\u8ba2\u5355\u72b6\u6001\u5df2\u66f4\u65b0",
-  noOrders: "\u6682\u65e0\u8ba2\u5355\u3002",
-  selectHint: "\u8bf7\u5148\u9009\u62e9\u5de6\u4fa7\u8ba2\u5355\u67e5\u770b\u8be6\u60c5\u3002",
-  orderCard: "\u8ba2\u5355",
-  orderDetailTitle: "\u8ba2\u5355\u8be6\u60c5",
-  orderItem: "\u5546\u54c1",
-  totalPrice: "\u603b\u91d1\u989d",
-  status: "\u72b6\u6001",
-  quantity: "\u6570\u91cf",
-  price: "\u5355\u4ef7",
-  payNow: "\u53bb\u652f\u4ed8",
-  shipNow: "\u786e\u8ba4\u53d1\u8d27",
-  confirmReceipt: "\u786e\u8ba4\u6536\u8d27"
+  eyebrow: "订单中心",
+  buyerTitle: "我的订单",
+  sellerTitle: "待处理订单",
+  loadOrdersFailed: "订单加载失败",
+  loadDetailFailed: "订单详情加载失败",
+  updateFailed: "更新订单状态失败",
+  actionSuccess: "订单状态已更新",
+  noOrders: "暂无订单。",
+  selectHint: "请先选择左侧订单查看详情。",
+  orderCard: "订单",
+  orderDetailTitle: "订单详情",
+  orderItem: "商品",
+  totalPrice: "总金额",
+  status: "状态",
+  quantity: "数量",
+  price: "单价",
+  payNow: "去支付",
+  cancelOrder: "取消订单",
+  shipNow: "确认发货",
+  confirmReceipt: "确认收货"
 };
 
 export default function OrderPage() {
@@ -40,7 +41,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     if (user) {
-      loadOrders(searchParams.get("orderId"));
+      void loadOrders(searchParams.get("orderId"));
     }
   }, [user, searchParams]);
 
@@ -105,9 +106,14 @@ export default function OrderPage() {
 
     if (!sellerMode && selectedOrder.status === "pending") {
       return (
-        <button className="primary-button" type="button" onClick={() => handleAction("paid")}>
-          {TEXT.payNow}
-        </button>
+        <div className="action-row">
+          <button className="primary-button" type="button" onClick={() => handleAction("paid")}>
+            {TEXT.payNow}
+          </button>
+          <button className="ghost-button" type="button" onClick={() => handleAction("cancelled")}>
+            {TEXT.cancelOrder}
+          </button>
+        </div>
       );
     }
 

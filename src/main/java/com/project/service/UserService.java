@@ -125,16 +125,10 @@ public class UserService {
     }
 
     private String resolveInitialRole(String requestedRole) {
-        if ("seller".equals(requestedRole) || "admin".equals(requestedRole)) {
-            return requestedRole;
-        }
         return "buyer";
     }
 
     private String resolveAvailableRoles(String requestedRole) {
-        if ("admin".equals(requestedRole)) {
-            return "buyer,seller,admin";
-        }
         return "buyer,seller";
     }
 

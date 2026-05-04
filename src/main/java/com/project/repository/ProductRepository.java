@@ -35,6 +35,14 @@ public interface ProductRepository {
     @Select("""
             SELECT product_id, seller_id, name, description, image_url, price, stock, category_id, status, created_at, updated_at
             FROM products
+            WHERE seller_id = #{sellerId}
+            ORDER BY updated_at DESC
+            """)
+    List<Product> findBySellerId(Integer sellerId);
+
+    @Select("""
+            SELECT product_id, seller_id, name, description, image_url, price, stock, category_id, status, created_at, updated_at
+            FROM products
             WHERE product_id = #{productId}
             """)
     Product findById(Integer productId);
@@ -76,4 +84,16 @@ public interface ProductRepository {
             WHERE product_id = #{productId} AND stock >= #{quantity}
             """)
     int decreaseStock(@Param("productId") Integer productId, @Param("quantity") Integer quantity);
+
+    @Update("""
+            UPDATE products
+            SET stock = stock + #{quantity},
+                status = CASE
+                    WHEN status = 'off_shelf' THEN 'off_shelf'
+                    WHEN stock + #{quantity} > 0 THEN 'on_sale'
+                    ELSE 'sold_out'
+                END
+            WHERE product_id = #{productId}
+            """)
+    int increaseStock(@Param("productId") Integer productId, @Param("quantity") Integer quantity);
 }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { createProduct, deleteProduct, updateProduct } from "../../api/productApi";
+import { createProduct, deleteProduct, fetchSellerProducts, updateProduct } from "../../api/productApi";
 import SectionTitle from "../../components/SectionTitle";
 import { useAuth } from "../../context/AuthContext";
 import { CATEGORY_OPTIONS } from "../../utils/constants";
-import { ROLE_LABELS } from "../../utils/labels";
+import { ROLE_LABELS, PRODUCT_STATUS_LABELS } from "../../utils/labels";
 import { getErrorMessage } from "../../utils/format";
 import { EMAIL_REGEX, PHONE_REGEX, isValidEmail, isValidPhone } from "../../utils/validation";
 
@@ -33,70 +33,72 @@ const productInitialState = {
 };
 
 const TEXT = {
-  accountCenter: "\u8d26\u6237\u4e2d\u5fc3",
-  accountTitleGuest: "\u767b\u5f55\u6216\u6ce8\u518c\u8d26\u53f7",
-  accountTitleUser: "\u4e2a\u4eba\u8d44\u6599\u4e0e\u5356\u5bb6\u540e\u53f0",
-  accountDesc:
-    "\u767b\u5f55\u540e\u53ef\u7ba1\u7406\u4e2a\u4eba\u8d44\u6599\uff0c\u5356\u5bb6\u8d26\u53f7\u53ef\u53d1\u5e03\u548c\u7f16\u8f91\u5546\u54c1\u3002",
-  login: "\u767b\u5f55",
-  register: "\u6ce8\u518c",
-  profile: "\u4e2a\u4eba\u8d44\u6599",
-  sellerCenter: "\u5356\u5bb6\u4e2d\u5fc3",
-  username: "\u7528\u6237\u540d",
-  usernameOrEmail: "\u7528\u6237\u540d\u6216\u90ae\u7bb1",
-  password: "\u5bc6\u7801",
-  email: "\u90ae\u7bb1\u5730\u5740",
-  phone: "\u624b\u673a\u53f7",
-  createAccount: "\u521b\u5efa\u8d26\u53f7",
-  saveProfile: "\u4fdd\u5b58\u8d44\u6599",
-  switchRole: "\u5207\u6362\u8eab\u4efd",
-  currentRole: "\u5f53\u524d\u8eab\u4efd",
-  switchRoleSuccess: "\u8eab\u4efd\u5207\u6362\u6210\u529f\u3002",
-  switchRoleFailed: "\u8eab\u4efd\u5207\u6362\u5931\u8d25",
-  sellerRoleRequired: "\u5df2\u81ea\u52a8\u5207\u6362\u4e3a\u5356\u5bb6\u8eab\u4efd",
-  sellerRoleUnavailable: "\u5f53\u524d\u8d26\u53f7\u6ca1\u6709\u5356\u5bb6\u6743\u9650",
-  createProduct: "\u521b\u5efa\u5546\u54c1",
-  updateOrDeleteProduct: "\u66f4\u65b0\u6216\u5220\u9664\u5546\u54c1",
-  productId: "\u5546\u54c1 ID",
-  productName: "\u5546\u54c1\u540d\u79f0",
-  productDesc: "\u5546\u54c1\u63cf\u8ff0",
-  productImage: "\u5546\u54c1\u56fe\u7247 URL",
-  price: "\u4ef7\u683c",
-  stock: "\u5e93\u5b58",
-  categoryId: "\u5546\u54c1\u5206\u7c7b",
-  selectCategory: "\u8bf7\u9009\u62e9\u5206\u7c7b",
-  keepCategory: "\u4e0d\u4fee\u6539\u5206\u7c7b",
-  onSale: "\u9500\u552e\u4e2d",
-  soldOut: "\u5df2\u552e\u7f44",
-  offShelf: "\u5df2\u4e0b\u67b6",
-  update: "\u66f4\u65b0",
-  delete: "\u5220\u9664",
-  enterUsernameOrEmail: "\u8bf7\u8f93\u5165\u7528\u6237\u540d\u6216\u90ae\u7bb1",
-  enterUsername: "\u8bf7\u8f93\u5165\u7528\u6237\u540d",
-  enterPassword: "\u8bf7\u8f93\u5165\u5bc6\u7801",
-  invalidEmail: "\u90ae\u7bb1\u683c\u5f0f\u4e0d\u6b63\u786e\uff0c\u8bf7\u8f93\u5165\u6709\u6548\u7684\u90ae\u7bb1\u5730\u5740",
-  invalidPhone: "\u624b\u673a\u53f7\u683c\u5f0f\u4e0d\u6b63\u786e\uff0c\u8bf7\u8f93\u5165 11 \u4f4d\u4e2d\u56fd\u5927\u9646\u624b\u673a\u53f7",
-  registerSuccess: (userId) =>
-    `\u6ce8\u518c\u6210\u529f\uff0c\u7528\u6237 ID\uff1a${userId}\uff0c\u8bf7\u5148\u767b\u5f55\u3002`,
-  loginSuccess: "\u767b\u5f55\u6210\u529f",
-  profileSaved: "\u8d44\u6599\u66f4\u65b0\u6210\u529f\u3002",
-  productCreated: (productId) => `\u5546\u54c1\u521b\u5efa\u6210\u529f\uff0c\u5546\u54c1 ID\uff1a${productId}`,
-  productUpdated: "\u5546\u54c1\u66f4\u65b0\u6210\u529f\u3002",
-  productDeleted: "\u5546\u54c1\u5220\u9664\u6210\u529f\u3002",
-  enterProductId: "\u8bf7\u8f93\u5165\u5546\u54c1 ID\u3002",
-  enterProductName: "\u8bf7\u8f93\u5165\u5546\u54c1\u540d\u79f0",
-  enterProductPrice: "\u8bf7\u8f93\u5165\u5408\u6cd5\u7684\u5546\u54c1\u4ef7\u683c",
-  enterProductStock: "\u8bf7\u8f93\u5165\u5408\u6cd5\u7684\u5546\u54c1\u5e93\u5b58",
-  enterProductCategory: "\u8bf7\u9009\u62e9\u5546\u54c1\u5206\u7c7b",
-  registerFailed: "\u6ce8\u518c\u5931\u8d25",
-  loginFailed: "\u767b\u5f55\u5931\u8d25",
-  profileSaveFailed: "\u8d44\u6599\u66f4\u65b0\u5931\u8d25",
-  productCreateFailed: "\u521b\u5efa\u5546\u54c1\u5931\u8d25",
-  productUpdateFailed: "\u66f4\u65b0\u5546\u54c1\u5931\u8d25",
-  productDeleteFailed: "\u5220\u9664\u5546\u54c1\u5931\u8d25",
-  emailTitle:
-    "\u8bf7\u8f93\u5165\u6709\u6548\u7684\u90ae\u7bb1\u5730\u5740\uff0c\u4f8b\u5982 name@example.com",
-  phoneTitle: "\u8bf7\u8f93\u5165 11 \u4f4d\u4e2d\u56fd\u5927\u9646\u624b\u673a\u53f7"
+  accountCenter: "账户中心",
+  accountTitleGuest: "登录或注册账号",
+  accountTitleUser: "个人资料与卖家后台",
+  accountDesc: "登录后可管理个人资料，卖家账号可发布和编辑商品。",
+  login: "登录",
+  register: "注册",
+  profile: "个人资料",
+  sellerCenter: "卖家中心",
+  username: "用户名",
+  usernameOrEmail: "用户名或邮箱",
+  password: "密码",
+  email: "邮箱地址",
+  phone: "手机号",
+  createAccount: "创建账号",
+  saveProfile: "保存资料",
+  switchRole: "切换身份",
+  currentRole: "当前身份",
+  switchRoleSuccess: "身份切换成功。",
+  switchRoleFailed: "身份切换失败",
+  sellerRoleRequired: "已自动切换为卖家身份",
+  sellerRoleUnavailable: "当前账号没有卖家权限",
+  createProduct: "创建商品",
+  updateOrDeleteProduct: "更新或删除商品",
+  sellerInventory: "我的商品",
+  inventoryEmpty: "还没有已发布商品，先创建一个吧。",
+  inventoryLoadFailed: "商品列表加载失败",
+  inventoryLoading: "商品列表加载中...",
+  selectProductHint: "点击商品可快速回填到右侧表单进行更新或删除。",
+  productId: "商品 ID",
+  productName: "商品名称",
+  productDesc: "商品描述",
+  productImage: "商品图片 URL",
+  price: "价格",
+  stock: "库存",
+  categoryId: "商品分类",
+  selectCategory: "请选择分类",
+  keepCategory: "不修改分类",
+  onSale: "销售中",
+  soldOut: "已售罄",
+  offShelf: "已下架",
+  update: "更新",
+  delete: "删除",
+  enterUsernameOrEmail: "请输入用户名或邮箱",
+  enterUsername: "请输入用户名",
+  enterPassword: "请输入密码",
+  invalidEmail: "邮箱格式不正确，请输入有效的邮箱地址",
+  invalidPhone: "手机号格式不正确，请输入 11 位中国大陆手机号",
+  registerSuccess: (userId) => `注册成功，用户 ID：${userId}，请先登录。`,
+  loginSuccess: "登录成功",
+  profileSaved: "资料更新成功。",
+  productCreated: (productId) => `商品创建成功，商品 ID：${productId}`,
+  productUpdated: "商品更新成功。",
+  productDeleted: "商品删除成功。",
+  enterProductId: "请输入商品 ID。",
+  enterProductName: "请输入商品名称",
+  enterProductPrice: "请输入合法的商品价格",
+  enterProductStock: "请输入合法的商品库存",
+  enterProductCategory: "请选择商品分类",
+  registerFailed: "注册失败",
+  loginFailed: "登录失败",
+  profileSaveFailed: "资料更新失败",
+  productCreateFailed: "创建商品失败",
+  productUpdateFailed: "更新商品失败",
+  productDeleteFailed: "删除商品失败",
+  emailTitle: "请输入有效的邮箱地址，例如 name@example.com",
+  phoneTitle: "请输入 11 位中国大陆手机号"
 };
 
 export default function UserPage() {
@@ -117,8 +119,14 @@ export default function UserPage() {
   );
   const [selectedRole, setSelectedRole] = useState(user?.role || "buyer");
   const [productForm, setProductForm] = useState(productInitialState);
+  const [sellerProducts, setSellerProducts] = useState([]);
+  const [sellerProductsLoading, setSellerProductsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const availableRoles = user?.roles?.length ? user.roles : ["buyer", "seller"];
+  const canUseSellerCenter = !!user && (availableRoles.includes("seller") || user.role === "admin");
+  const isSeller = !!user && ["seller", "admin"].includes(user.role);
 
   useEffect(() => {
     if (user) {
@@ -131,6 +139,25 @@ export default function UserPage() {
       setActiveTab("profile");
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || activeTab !== "seller" || !isSeller) {
+      return;
+    }
+    void loadSellerProducts();
+  }, [activeTab, isSeller, user]);
+
+  const loadSellerProducts = async () => {
+    try {
+      setSellerProductsLoading(true);
+      const data = await fetchSellerProducts();
+      setSellerProducts(data);
+    } catch (err) {
+      setError(getErrorMessage(err, TEXT.inventoryLoadFailed));
+    } finally {
+      setSellerProductsLoading(false);
+    }
+  };
 
   const handleRegister = async (event) => {
     event.preventDefault();
@@ -275,6 +302,20 @@ export default function UserPage() {
     }
   };
 
+  const handleSelectSellerProduct = (product) => {
+    setProductForm({
+      product_id: String(product.productId),
+      name: product.name || "",
+      description: product.description || "",
+      image_url: product.imageUrl || "",
+      price: product.price != null ? String(product.price) : "",
+      stock: product.stock != null ? String(product.stock) : "",
+      category_id: product.categoryId != null ? String(product.categoryId) : "",
+      status: product.status || "on_sale"
+    });
+    setMessage(TEXT.selectProductHint);
+  };
+
   const handleProductCreate = async (event) => {
     event.preventDefault();
     setError("");
@@ -309,6 +350,7 @@ export default function UserPage() {
       });
       setMessage(TEXT.productCreated(data.productId));
       setProductForm(productInitialState);
+      await loadSellerProducts();
     } catch (err) {
       setError(getErrorMessage(err, TEXT.productCreateFailed));
     }
@@ -326,18 +368,18 @@ export default function UserPage() {
         description: productForm.description || undefined,
         image_url: productForm.image_url.trim() || undefined,
         price: productForm.price ? Number(productForm.price) : undefined,
-        stock: productForm.stock ? Number(productForm.stock) : undefined,
+        stock: productForm.stock === "" ? undefined : Number(productForm.stock),
         category_id: productForm.category_id ? Number(productForm.category_id) : undefined,
         status: productForm.status || undefined
       });
       setMessage(TEXT.productUpdated);
+      await loadSellerProducts();
     } catch (err) {
       setError(getErrorMessage(err, TEXT.productUpdateFailed));
     }
   };
 
-  const handleProductDelete = async (event) => {
-    event.preventDefault();
+  const handleProductDelete = async () => {
     if (!productForm.product_id) {
       setError(TEXT.enterProductId);
       return;
@@ -351,14 +393,11 @@ export default function UserPage() {
       await deleteProduct(Number(productForm.product_id));
       setMessage(TEXT.productDeleted);
       setProductForm(productInitialState);
+      await loadSellerProducts();
     } catch (err) {
       setError(getErrorMessage(err, TEXT.productDeleteFailed));
     }
   };
-
-  const availableRoles = user?.roles?.length ? user.roles : ["buyer", "seller"];
-  const canUseSellerCenter = !!user && (availableRoles.includes("seller") || user.role === "admin");
-  const isSeller = !!user && ["seller", "admin"].includes(user.role);
 
   return (
     <div className="stack-lg">
@@ -517,66 +556,92 @@ export default function UserPage() {
 
       {user && activeTab === "seller" && isSeller ? (
         <div className="grid-two">
-          <form className="panel-form" onSubmit={handleProductCreate}>
-            <h3>{TEXT.createProduct}</h3>
-            <input
-              placeholder={TEXT.productName}
-              value={productForm.name}
-              onChange={(event) =>
-                setProductForm((prev) => ({ ...prev, name: event.target.value }))
-              }
-            />
-            <textarea
-              rows="4"
-              placeholder={TEXT.productDesc}
-              value={productForm.description}
-              onChange={(event) =>
-                setProductForm((prev) => ({ ...prev, description: event.target.value }))
-              }
-            />
-            <input
-              placeholder={TEXT.productImage}
-              value={productForm.image_url}
-              onChange={(event) =>
-                setProductForm((prev) => ({ ...prev, image_url: event.target.value }))
-              }
-            />
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder={TEXT.price}
-              value={productForm.price}
-              onChange={(event) =>
-                setProductForm((prev) => ({ ...prev, price: event.target.value }))
-              }
-            />
-            <input
-              type="number"
-              min="0"
-              placeholder={TEXT.stock}
-              value={productForm.stock}
-              onChange={(event) =>
-                setProductForm((prev) => ({ ...prev, stock: event.target.value }))
-              }
-            />
-            <select
-              value={productForm.category_id}
-              onChange={(event) =>
-                setProductForm((prev) => ({ ...prev, category_id: event.target.value }))
-              }
-            >
-              <option value="">{TEXT.selectCategory}</option>
-              {CATEGORY_OPTIONS.map((category) => (
-                <option key={category.id} value={String(category.id)}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-            <button className="primary-button" type="submit">
-              {TEXT.createProduct}
-            </button>
-          </form>
+          <div className="stack-md">
+            <div className="feature-panel stack-md">
+              <h3>{TEXT.sellerInventory}</h3>
+              {sellerProductsLoading ? <div className="notice">{TEXT.inventoryLoading}</div> : null}
+              {!sellerProductsLoading && !sellerProducts.length ? (
+                <div className="empty-state">{TEXT.inventoryEmpty}</div>
+              ) : (
+                <div className="review-list">
+                  {sellerProducts.map((product) => (
+                    <button
+                      key={product.productId}
+                      type="button"
+                      className="review-item"
+                      onClick={() => handleSelectSellerProduct(product)}
+                    >
+                      <strong>{product.name}</strong>
+                      <span>{`ID: ${product.productId}`}</span>
+                      <span>{PRODUCT_STATUS_LABELS[product.status] || product.status}</span>
+                      <span>{`库存 ${product.stock}`}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <form className="panel-form" onSubmit={handleProductCreate}>
+              <h3>{TEXT.createProduct}</h3>
+              <input
+                placeholder={TEXT.productName}
+                value={productForm.name}
+                onChange={(event) =>
+                  setProductForm((prev) => ({ ...prev, name: event.target.value }))
+                }
+              />
+              <textarea
+                rows="4"
+                placeholder={TEXT.productDesc}
+                value={productForm.description}
+                onChange={(event) =>
+                  setProductForm((prev) => ({ ...prev, description: event.target.value }))
+                }
+              />
+              <input
+                placeholder={TEXT.productImage}
+                value={productForm.image_url}
+                onChange={(event) =>
+                  setProductForm((prev) => ({ ...prev, image_url: event.target.value }))
+                }
+              />
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder={TEXT.price}
+                value={productForm.price}
+                onChange={(event) =>
+                  setProductForm((prev) => ({ ...prev, price: event.target.value }))
+                }
+              />
+              <input
+                type="number"
+                min="0"
+                placeholder={TEXT.stock}
+                value={productForm.stock}
+                onChange={(event) =>
+                  setProductForm((prev) => ({ ...prev, stock: event.target.value }))
+                }
+              />
+              <select
+                value={productForm.category_id}
+                onChange={(event) =>
+                  setProductForm((prev) => ({ ...prev, category_id: event.target.value }))
+                }
+              >
+                <option value="">{TEXT.selectCategory}</option>
+                {CATEGORY_OPTIONS.map((category) => (
+                  <option key={category.id} value={String(category.id)}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+              <button className="primary-button" type="submit">
+                {TEXT.createProduct}
+              </button>
+            </form>
+          </div>
 
           <form className="panel-form" onSubmit={handleProductUpdate}>
             <h3>{TEXT.updateOrDeleteProduct}</h3>

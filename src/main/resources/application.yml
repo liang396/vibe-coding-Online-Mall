@@ -9,11 +9,11 @@ spring:
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT:6390}
       password: ${REDIS_PASSWORD:}
   sql:
     init:
-      mode: always
+      mode: ${SQL_INIT_MODE:never}
       encoding: UTF-8
       schema-locations: classpath:db/schema.sql
       data-locations: classpath:db/data.sql
@@ -29,6 +29,18 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  ai:
+    enabled: ${AI_ENABLED:true}
+    base-url: ${AI_BASE_URL:https://api.deepseek.com}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:deepseek-chat}
+    timeout-ms: ${AI_TIMEOUT_MS:8000}
+    max-history-messages: ${AI_MAX_HISTORY_MESSAGES:8}
+    rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
+
 logging:
   level:
-    com.project.repository: debug
+    com.project.repository: ${REPOSITORY_LOG_LEVEL:info}

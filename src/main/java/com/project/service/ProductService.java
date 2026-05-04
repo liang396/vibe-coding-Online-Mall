@@ -43,15 +43,15 @@ public class ProductService {
         int offset = (safePage - 1) * safeSize;
         return new ArrayList<>(productRepository.findAll(categoryId, keyword, safeSize, offset)
                 .stream()
-                .map(product -> new ProductSummaryResponse(
-                        product.getProductId(),
-                        product.getCategoryId(),
-                        product.getName(),
-                        product.getDescription(),
-                        product.getImageUrl(),
-                        product.getPrice(),
-                        product.getStock(),
-                        product.getStatus()))
+                .map(this::toSummary)
+                .collect(Collectors.toList()));
+    }
+
+    public List<ProductSummaryResponse> listBySeller(AuthenticatedUser currentUser) {
+        ensureSeller(currentUser);
+        return new ArrayList<>(productRepository.findBySellerId(currentUser.getUserId())
+                .stream()
+                .map(this::toSummary)
                 .collect(Collectors.toList()));
     }
 
@@ -149,6 +149,18 @@ public class ProductService {
         if (!currentUser.getUserId().equals(product.getSellerId()) && !"admin".equals(currentUser.getRole())) {
             throw new UnauthorizedException("No permission");
         }
+    }
+
+    private ProductSummaryResponse toSummary(Product product) {
+        return new ProductSummaryResponse(
+                product.getProductId(),
+                product.getCategoryId(),
+                product.getName(),
+                product.getDescription(),
+                product.getImageUrl(),
+                product.getPrice(),
+                product.getStock(),
+                product.getStatus());
     }
 
     private ProductDetailResponse toDetail(Product product) {
