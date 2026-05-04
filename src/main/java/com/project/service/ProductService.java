@@ -1,6 +1,5 @@
 package com.project.service;
 
-import static com.project.config.RedisCacheConfig.PRODUCT_DETAIL_CACHE;
 import static com.project.config.RedisCacheConfig.PRODUCT_LIST_CACHE;
 
 import com.project.dto.product.CreateProductResponse;
@@ -19,9 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,17 +27,16 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductCacheService productCacheService;
+    private final ProductDetailCacheService productDetailCacheService;
 
-    @Cacheable(
-            cacheNames = PRODUCT_LIST_CACHE,
-            key = "(#categoryId == null ? 'all' : #categoryId) + ':' + (#keyword == null ? '' : #keyword.trim()) + ':'"
-                    + " + (#page == null || #page < 1 ? 1 : #page) + ':' + "
-                    + "(#size == null || #size < 1 ? 10 : (#size > 100 ? 100 : #size))",
-            sync = true)
+    @Cacheable(cacheNames = PRODUCT_LIST_CACHE, key = "#root.target.buildListCacheKey(#categoryId, #keyword, #page, #size)", sync = true)
     public List<ProductSummaryResponse> list(Integer categoryId, String keyword, Integer page, Integer size) {
         int safePage = page == null || page < 1 ? 1 : page;
         int safeSize = size == null || size < 1 ? 10 : Math.min(size, 100);
         int offset = (safePage - 1) * safeSize;
+        String cacheKey = buildListCacheKey(categoryId, keyword, page, size);
+        productCacheService.trackProductListKey(cacheKey);
         return new ArrayList<>(productRepository.findAll(categoryId, keyword, safeSize, offset)
                 .stream()
                 .map(this::toSummary)
@@ -55,13 +51,10 @@ public class ProductService {
                 .collect(Collectors.toList()));
     }
 
-    @Cacheable(cacheNames = PRODUCT_DETAIL_CACHE, key = "#productId", sync = true)
     public ProductDetailResponse getDetail(Integer productId) {
-        Product product = requireProduct(productId);
-        return toDetail(product);
+        return productDetailCacheService.getOrLoad(productId, () -> toDetail(requireProduct(productId)));
     }
 
-    @CacheEvict(cacheNames = PRODUCT_LIST_CACHE, allEntries = true)
     public CreateProductResponse create(ProductCreateRequest request, AuthenticatedUser currentUser) {
         ensureSeller(currentUser);
         validateCategory(request.getCategoryId());
@@ -76,13 +69,10 @@ public class ProductService {
         product.setCategoryId(request.getCategoryId());
         product.setStatus(request.getStock() > 0 ? "on_sale" : "sold_out");
         productRepository.insert(product);
+        productCacheService.evictProduct(product.getProductId());
         return new CreateProductResponse(true, product.getProductId());
     }
 
-    @Caching(evict = {
-        @CacheEvict(cacheNames = PRODUCT_LIST_CACHE, allEntries = true),
-        @CacheEvict(cacheNames = PRODUCT_DETAIL_CACHE, key = "#productId")
-    })
     public void update(Integer productId, ProductUpdateRequest request, AuthenticatedUser currentUser) {
         Product existing = requireProduct(productId);
         ensureSellerOwnerOrAdmin(existing, currentUser);
@@ -113,16 +103,14 @@ public class ProductService {
             product.setStatus("sold_out");
         }
         productRepository.update(product);
+        productCacheService.evictProduct(productId);
     }
 
-    @Caching(evict = {
-        @CacheEvict(cacheNames = PRODUCT_LIST_CACHE, allEntries = true),
-        @CacheEvict(cacheNames = PRODUCT_DETAIL_CACHE, key = "#productId")
-    })
     public void delete(Integer productId, AuthenticatedUser currentUser) {
         Product existing = requireProduct(productId);
         ensureSellerOwnerOrAdmin(existing, currentUser);
         productRepository.deleteById(productId);
+        productCacheService.evictProduct(productId);
     }
 
     public Product requireProduct(Integer productId) {
@@ -131,6 +119,13 @@ public class ProductService {
             throw new NotFoundException("Product not found");
         }
         return product;
+    }
+
+    public String buildListCacheKey(Integer categoryId, String keyword, Integer page, Integer size) {
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeSize = size == null || size < 1 ? 10 : Math.min(size, 100);
+        String safeKeyword = keyword == null ? "" : keyword.trim();
+        return (categoryId == null ? "all" : categoryId) + ":" + safeKeyword + ":" + safePage + ":" + safeSize;
     }
 
     private void validateCategory(Integer categoryId) {

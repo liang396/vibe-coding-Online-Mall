@@ -12,6 +12,7 @@ import com.project.repository.OrderRepository;
 import com.project.repository.ProductRepository;
 import com.project.security.AuthenticatedUser;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -174,6 +175,17 @@ class OrderServiceTest {
 
         assertEquals("该订单包含多个卖家的商品，当前不支持卖家直接发货", exception.getMessage());
         verify(orderRepository, never()).updateStatusIfCurrentStatus(300, "paid", "shipped");
+    }
+
+    @Test
+    void restoreStockForTimeoutReleasesInventory() {
+        when(orderItemRepository.findByOrderId(401)).thenReturn(List.of(orderItem(101, 2), orderItem(102, 3)));
+
+        orderService.restoreStockForTimeout(401);
+
+        verify(productRepository).increaseStock(101, 2);
+        verify(productRepository).increaseStock(102, 3);
+        verify(productCacheService).evictProducts(List.of(101, 102));
     }
 
     private CreateOrderRequest createRequest(String idempotencyKey, OrderItemRequest... items) {

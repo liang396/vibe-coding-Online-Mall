@@ -1,5 +1,6 @@
 package com.project.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,16 +19,19 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @EnableCaching
 public class RedisCacheConfig {
 
-    public static final String PRODUCT_LIST_CACHE = "product:list:v4";
-    public static final String PRODUCT_DETAIL_CACHE = "product:detail:v4";
-    public static final String PRODUCT_REVIEW_CACHE = "product:review:v4";
+    public static final String PRODUCT_LIST_CACHE = "product:list:v5";
+    public static final String PRODUCT_DETAIL_CACHE = "product:detail:v5";
+    public static final String PRODUCT_REVIEW_CACHE = "product:review:v5";
+    public static final Duration PRODUCT_NULL_TTL = Duration.ofSeconds(30);
+    public static final Duration PRODUCT_DETAIL_LOCK_TTL = Duration.ofSeconds(10);
 
     @Bean
-    public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
+    public CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory, ObjectMapper objectMapper) {
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(objectMapper);
         RedisCacheConfiguration defaultConfiguration = RedisCacheConfiguration.defaultCacheConfig()
                 .disableCachingNullValues()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()));
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));
 
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
         cacheConfigurations.put(PRODUCT_LIST_CACHE, defaultConfiguration.entryTtl(Duration.ofMinutes(3)));

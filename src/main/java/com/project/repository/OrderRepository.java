@@ -1,6 +1,7 @@
 package com.project.repository;
 
 import com.project.entity.Order;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -50,6 +51,16 @@ public interface OrderRepository {
             </script>
             """)
     List<Order> findAllBySellerId(@Param("sellerId") Integer sellerId, @Param("status") String status);
+
+    @Select("""
+            SELECT order_id, buyer_id, total_price, status, created_at, updated_at
+            FROM orders
+            WHERE status = 'pending'
+              AND created_at <= #{expireBefore}
+            ORDER BY created_at ASC
+            LIMIT 100
+            """)
+    List<Order> findPendingOrdersCreatedBefore(@Param("expireBefore") LocalDateTime expireBefore);
 
     @Select("""
             SELECT COUNT(*)

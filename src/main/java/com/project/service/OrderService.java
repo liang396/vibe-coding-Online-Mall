@@ -164,6 +164,11 @@ public class OrderService {
         }
     }
 
+    @Transactional
+    public void restoreStockForTimeout(Integer orderId) {
+        restoreStock(orderId);
+    }
+
     private Order requireOrder(Integer orderId) {
         Order order = orderRepository.findById(orderId);
         if (order == null) {
