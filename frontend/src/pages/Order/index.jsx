@@ -17,12 +17,15 @@ const TEXT = {
   noOrders: "暂无订单。",
   selectHint: "请先选择左侧订单查看详情。",
   orderCard: "订单",
+  orderNo: "订单号",
   orderDetailTitle: "订单详情",
   orderItem: "商品",
   totalPrice: "总金额",
   status: "状态",
   quantity: "数量",
   price: "单价",
+  subtotal: "小计",
+  itemCount: "商品数",
   payNow: "去支付",
   cancelOrder: "取消订单",
   shipNow: "确认发货",
@@ -128,6 +131,8 @@ export default function OrderPage() {
     return null;
   };
 
+  const getItemSubtotal = (item) => item.price * item.quantity;
+
   return (
     <div className="stack-lg">
       <SectionTitle
@@ -143,12 +148,12 @@ export default function OrderPage() {
             orders.map((order) => (
               <button
                 key={order.orderId}
-                className="order-summary"
+                className={`order-summary${selectedOrder?.orderId === order.orderId ? " active" : ""}`}
                 onClick={() => handleSelect(order.orderId)}
               >
-                <strong>{TEXT.orderCard}</strong>
-                <span>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
-                <span>{formatCurrency(order.totalPrice)}</span>
+                <strong>{`${TEXT.orderCard} #${order.orderId}`}</strong>
+                <span>{`${TEXT.status}: ${ORDER_STATUS_LABELS[order.status] || order.status}`}</span>
+                <span>{`${TEXT.totalPrice}: ${formatCurrency(order.totalPrice)}`}</span>
               </button>
             ))
           ) : (
@@ -160,15 +165,19 @@ export default function OrderPage() {
           {selectedOrder ? (
             <div className="stack-md">
               <h3>{TEXT.orderDetailTitle}</h3>
-              <p>{`${TEXT.totalPrice}: ${formatCurrency(selectedOrder.totalPrice)}`}</p>
+              <p>{`${TEXT.orderNo}: #${selectedOrder.orderId}`}</p>
               <p>{`${TEXT.status}: ${ORDER_STATUS_LABELS[selectedOrder.status] || selectedOrder.status}`}</p>
+              <p>{`${TEXT.itemCount}: ${selectedOrder.items.length}`}</p>
+              <p>{`${TEXT.totalPrice}: ${formatCurrency(selectedOrder.totalPrice)}`}</p>
               {renderActions()}
               <div className="review-list">
                 {selectedOrder.items.map((item) => (
-                  <div key={item.productId} className="review-item">
-                    <strong>{TEXT.orderItem}</strong>
-                    <span>{`${TEXT.quantity} ${item.quantity}`}</span>
-                    <span>{`${TEXT.price} ${formatCurrency(item.price)}`}</span>
+                  <div key={`${selectedOrder.orderId}-${item.productId}`} className="review-item">
+                    <strong>{item.productName || `${TEXT.orderItem} #${item.productId}`}</strong>
+                    <span>{`${TEXT.orderItem} ID: ${item.productId}`}</span>
+                    <span>{`${TEXT.quantity}: ${item.quantity}`}</span>
+                    <span>{`${TEXT.price}: ${formatCurrency(item.price)}`}</span>
+                    <span>{`${TEXT.subtotal}: ${formatCurrency(getItemSubtotal(item))}`}</span>
                   </div>
                 ))}
               </div>

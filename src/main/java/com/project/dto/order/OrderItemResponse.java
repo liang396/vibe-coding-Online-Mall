@@ -9,6 +9,7 @@ import lombok.Data;
 public class OrderItemResponse {
 
     private Integer productId;
+    private String productName;
     private Integer quantity;
     private BigDecimal price;
 }

@@ -140,7 +140,7 @@ public class OrderService {
         ensureOrderAccessible(order, currentUser);
         List<OrderItemResponse> items = orderItemRepository.findByOrderId(orderId)
                 .stream()
-                .map(item -> new OrderItemResponse(item.getProductId(), item.getQuantity(), item.getPrice()))
+                .map(item -> new OrderItemResponse(item.getProductId(), item.getProductName(), item.getQuantity(), item.getPrice()))
                 .toList();
         return new OrderDetailResponse(order.getOrderId(), order.getBuyerId(), order.getTotalPrice(), order.getStatus(), items);
     }

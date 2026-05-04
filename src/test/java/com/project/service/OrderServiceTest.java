@@ -2,6 +2,7 @@ package com.project.service;
 
 import com.project.dto.order.CreateOrderRequest;
 import com.project.dto.order.CreateOrderResponse;
+import com.project.dto.order.OrderDetailResponse;
 import com.project.dto.order.OrderItemRequest;
 import com.project.entity.Order;
 import com.project.entity.OrderItem;
@@ -12,7 +13,6 @@ import com.project.repository.OrderRepository;
 import com.project.repository.ProductRepository;
 import com.project.security.AuthenticatedUser;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,6 +111,23 @@ class OrderServiceTest {
 
         assertEquals("订单正在处理中，请勿重复提交", exception.getMessage());
         verify(orderRepository, never()).insert(any(Order.class));
+    }
+
+    @Test
+    void getDetailIncludesProductNames() {
+        Order order = new Order();
+        order.setOrderId(600);
+        order.setBuyerId(1);
+        order.setTotalPrice(new BigDecimal("99.00"));
+        order.setStatus("pending");
+        when(orderRepository.findById(600)).thenReturn(order);
+        when(orderItemRepository.findByOrderId(600)).thenReturn(List.of(orderItem(101, "机械键盘", 2)));
+
+        OrderDetailResponse response = orderService.getDetail(600, new AuthenticatedUser(1, "buyer", "buyer"));
+
+        assertEquals(600, response.getOrderId());
+        assertEquals("机械键盘", response.getItems().get(0).getProductName());
+        assertEquals(2, response.getItems().get(0).getQuantity());
     }
 
     @Test
@@ -217,6 +234,13 @@ class OrderServiceTest {
         OrderItem orderItem = new OrderItem();
         orderItem.setProductId(productId);
         orderItem.setQuantity(quantity);
+        return orderItem;
+    }
+
+    private OrderItem orderItem(int productId, String productName, int quantity) {
+        OrderItem orderItem = orderItem(productId, quantity);
+        orderItem.setProductName(productName);
+        orderItem.setPrice(new BigDecimal("49.50"));
         return orderItem;
     }
 }

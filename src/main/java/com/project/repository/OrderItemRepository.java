@@ -18,10 +18,16 @@ public interface OrderItemRepository {
     int insert(OrderItem orderItem);
 
     @Select("""
-            SELECT order_item_id, order_id, product_id, quantity, price
-            FROM order_items
-            WHERE order_id = #{orderId}
-            ORDER BY order_item_id ASC
+            SELECT oi.order_item_id,
+                   oi.order_id,
+                   oi.product_id,
+                   oi.quantity,
+                   oi.price,
+                   p.name AS productName
+            FROM order_items oi
+            JOIN products p ON p.product_id = oi.product_id
+            WHERE oi.order_id = #{orderId}
+            ORDER BY oi.order_item_id ASC
             """)
     List<OrderItem> findByOrderId(Integer orderId);
 }
