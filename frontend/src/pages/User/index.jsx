@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { createProduct, deleteProduct, updateProduct } from "../../api/productApi";
 import SectionTitle from "../../components/SectionTitle";
 import { useAuth } from "../../context/AuthContext";
@@ -101,6 +101,7 @@ const TEXT = {
 
 export default function UserPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, register, login, saveProfile, changeRole } = useAuth();
   const [activeTab, setActiveTab] = useState(user ? "profile" : "login");
   const [registerForm, setRegisterForm] = useState(registerInitialState);
@@ -191,7 +192,8 @@ export default function UserPage() {
     try {
       await login(payload);
       setMessage(TEXT.loginSuccess);
-      navigate("/orders");
+      const from = location.state?.from;
+      navigate(from || "/orders", { replace: true });
     } catch (err) {
       setError(getErrorMessage(err, TEXT.loginFailed));
     }

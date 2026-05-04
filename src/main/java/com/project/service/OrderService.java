@@ -35,6 +35,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final UserService userService;
+    private final ProductCacheService productCacheService;
 
     @Transactional
     public CreateOrderResponse create(CreateOrderRequest request, AuthenticatedUser currentUser) {
@@ -76,6 +77,9 @@ public class OrderService {
             orderItem.setPrice(product.getPrice());
             orderItemRepository.insert(orderItem);
         }
+
+        productCacheService.evictProducts(
+                request.getItems().stream().map(OrderItemRequest::getProductId).toList());
 
         return new CreateOrderResponse(true, order.getOrderId());
     }

@@ -46,8 +46,15 @@ public class SecurityConfig {
                                     "{\"success\":false,\"data\":null,\"message\":\"\\u6ca1\\u6709\\u6743\\u9650\\u8bbf\\u95ee\\u8be5\\u8d44\\u6e90\"}");
                         }))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/users/register", "/api/users/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*", "/api/products/*/reviews").permitAll()
+                        .requestMatchers(
+                                "/error",
+                                "/api/health",
+                                "/api/users/register",
+                                "/api/users/login",
+                                "/api/ai/chat",
+                                "/api/ai/chat/stream")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products", "/api/products/**").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())

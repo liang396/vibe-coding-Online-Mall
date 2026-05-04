@@ -1,6 +1,7 @@
 package com.project.config;
 
 import com.project.dto.ApiResponse;
+import com.project.exception.AiServiceException;
 import com.project.exception.BadRequestException;
 import com.project.exception.NotFoundException;
 import com.project.exception.UnauthorizedException;
@@ -29,6 +30,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.failure(ex.getMessage()));
+    }
+
+    @ExceptionHandler(AiServiceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiService(AiServiceException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.failure(ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

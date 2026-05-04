@@ -762,6 +762,7 @@ button {
   }
 }
 
+
 @media (max-width: 560px) {
   .page-shell {
     width: calc(100% - 20px);
@@ -789,4 +790,79 @@ button {
   .product-card {
     padding: 18px;
   }
+}
+
+.nav-pill-ai {
+  background: rgba(24, 32, 40, 0.08);
+  color: #182028;
+}
+
+.ai-chat-layout {
+  align-items: start;
+}
+
+.ai-chat-panel {
+  min-height: 560px;
+}
+
+.ai-chat-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #546371;
+}
+
+.ai-chat-messages {
+  display: grid;
+  gap: 12px;
+  min-height: 360px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.ai-chat-bubble {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(244, 247, 251, 0.9);
+}
+
+.ai-chat-bubble.user {
+  background: rgba(237, 106, 58, 0.12);
+}
+
+.ai-chat-bubble.assistant {
+  background: rgba(35, 116, 171, 0.1);
+}
+
+.ai-chat-bubble-content {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 1.5em;
+}
+
+.ai-chat-bubble-content.pending {
+  color: #5b6b79;
+}
+
+.ai-chat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ai-chat-suggestions p {
+  margin-bottom: 0;
+}
+
+.primary-button:disabled,
+.ghost-button:disabled,
+.quantity-box button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }

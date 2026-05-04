@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { fetchProduct } from "../../api/productApi";
 import { createReview, fetchProductReviews } from "../../api/reviewApi";
 import SectionTitle from "../../components/SectionTitle";
@@ -9,6 +9,7 @@ import { PRODUCT_STATUS_LABELS } from "../../utils/labels";
 import { formatCurrency, getErrorMessage } from "../../utils/format";
 
 export default function ProductDetailPage() {
+  const navigate = useNavigate();
   const { productId } = useParams();
   const { user } = useAuth();
   const { addItem } = useCart();
@@ -43,6 +44,20 @@ export default function ProductDetailPage() {
     } catch (err) {
       setError(getErrorMessage(err, "加入购物车失败"));
     }
+  };
+
+  const handleAskAi = () => {
+    if (!product) {
+      return;
+    }
+    navigate("/ai", {
+      state: {
+        productId: product.productId,
+        productName: product.name,
+        initialQuestion: `请帮我判断“${product.name}”值不值得买，并结合价格和公开评价给出建议。`,
+        autoSend: true
+      }
+    });
   };
 
   const handleReview = async (event) => {
@@ -103,9 +118,14 @@ export default function ProductDetailPage() {
             <span>状态</span>
             <strong>{PRODUCT_STATUS_LABELS[product.status] || product.status}</strong>
           </div>
-          <button className="primary-button" onClick={handleAddCart}>
-            加入购物车
-          </button>
+          <div className="action-row">
+            <button className="primary-button" onClick={handleAddCart}>
+              加入购物车
+            </button>
+            <button className="ghost-button" onClick={handleAskAi}>
+              问问 AI
+            </button>
+          </div>
           {message ? <div className="notice success">{message}</div> : null}
         </div>
       </section>

@@ -4,6 +4,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import HomePage from "../pages/Home";
 import ProductListPage from "../pages/ProductList";
 import ProductDetailPage from "../pages/ProductDetail";
+import AIChatPage from "../pages/AIChat";
 import CartPage from "../pages/Cart";
 import OrderPage from "../pages/Order";
 import UserPage from "../pages/User";
@@ -15,6 +16,7 @@ export default function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/products" element={<ProductListPage />} />
         <Route path="/products/:productId" element={<ProductDetailPage />} />
+        <Route path="/ai" element={<AIChatPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route
           path="/orders"

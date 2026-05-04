@@ -16,22 +16,26 @@ export default function Header() {
     <header className="site-header">
       <Link className="brand" to="/">
         <span className="brand-mark">M</span>
-        <span>{"\u4e8c\u624b\u5546\u57ce"}</span>
+        <span>{"二手商城"}</span>
       </Link>
 
       <nav className="main-nav">
-        <NavLink to="/">{"\u9996\u9875"}</NavLink>
-        <NavLink to="/products">{"\u5546\u54c1"}</NavLink>
+        <NavLink to="/">{"首页"}</NavLink>
+        <NavLink to="/products">{"商品"}</NavLink>
+        <NavLink className="nav-pill nav-pill-ai" to="/ai">
+          <span>{"AI问答"}</span>
+          <span className="nav-badge nav-badge-soft">{"新"}</span>
+        </NavLink>
         <NavLink className="nav-pill nav-pill-cart" to="/cart">
-          <span>{"\u8d2d\u7269\u8f66"}</span>
+          <span>{"购物车"}</span>
           <span className="nav-badge">{totalItems}</span>
         </NavLink>
         <NavLink className="nav-pill nav-pill-order" to="/orders">
-          <span>{"\u8ba2\u5355"}</span>
-          <span className="nav-badge nav-badge-soft">{"\u67e5\u770b"}</span>
+          <span>{"订单"}</span>
+          <span className="nav-badge nav-badge-soft">{"查看"}</span>
         </NavLink>
         <NavLink className="nav-auth-link" to="/user">
-          {user ? "\u6211\u7684\u8d26\u6237" : "\u767b\u5f55 / \u6ce8\u518c"}
+          {user ? "我的账户" : "登录 / 注册"}
         </NavLink>
       </nav>
 
@@ -39,12 +43,12 @@ export default function Header() {
         <div className="user-panel">
           <span>{user.username}</span>
           <button className="ghost-button" onClick={handleLogout}>
-            {"\u9000\u51fa\u767b\u5f55"}
+            {"退出登录"}
           </button>
         </div>
       ) : (
         <Link className="primary-link header-auth-link" to="/user">
-          {"\u8fdb\u5165\u8d26\u6237"}
+          {"进入账户"}
         </Link>
       )}
     </header>
