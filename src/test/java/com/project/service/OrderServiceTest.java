@@ -3,6 +3,7 @@ package com.project.service;
 import com.project.dto.order.CreateOrderRequest;
 import com.project.dto.order.CreateOrderResponse;
 import com.project.dto.order.OrderDetailResponse;
+import com.project.dto.order.OrderSummaryResponse;
 import com.project.dto.order.OrderItemRequest;
 import com.project.entity.Order;
 import com.project.entity.OrderItem;
@@ -13,6 +14,7 @@ import com.project.repository.OrderRepository;
 import com.project.repository.ProductRepository;
 import com.project.security.AuthenticatedUser;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,12 +116,29 @@ class OrderServiceTest {
     }
 
     @Test
+    void listIncludesCreatedAtForOrderNumberFormatting() {
+        Order order = new Order();
+        order.setOrderId(501);
+        order.setBuyerId(1);
+        order.setTotalPrice(new BigDecimal("88.00"));
+        order.setStatus("paid");
+        order.setCreatedAt(LocalDateTime.of(2026, 5, 5, 12, 30));
+        when(orderRepository.findAll(1, null)).thenReturn(List.of(order));
+
+        List<OrderSummaryResponse> response = orderService.list(1, null, "buyer", new AuthenticatedUser(1, "buyer", "buyer"));
+
+        assertEquals(1, response.size());
+        assertEquals(LocalDateTime.of(2026, 5, 5, 12, 30), response.get(0).getCreatedAt());
+    }
+
+    @Test
     void getDetailIncludesProductNames() {
         Order order = new Order();
         order.setOrderId(600);
         order.setBuyerId(1);
         order.setTotalPrice(new BigDecimal("99.00"));
         order.setStatus("pending");
+        order.setCreatedAt(LocalDateTime.of(2026, 5, 5, 18, 20));
         when(orderRepository.findById(600)).thenReturn(order);
         when(orderItemRepository.findByOrderId(600)).thenReturn(List.of(orderItem(101, "机械键盘", 2)));
 
@@ -128,6 +147,7 @@ class OrderServiceTest {
         assertEquals(600, response.getOrderId());
         assertEquals("机械键盘", response.getItems().get(0).getProductName());
         assertEquals(2, response.getItems().get(0).getQuantity());
+        assertEquals(LocalDateTime.of(2026, 5, 5, 18, 20), response.getCreatedAt());
     }
 
     @Test

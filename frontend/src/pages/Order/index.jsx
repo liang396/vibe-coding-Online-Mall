@@ -14,9 +14,10 @@ const TEXT = {
   loadDetailFailed: "订单详情加载失败",
   updateFailed: "更新订单状态失败",
   actionSuccess: "订单状态已更新",
+  loadingOrders: "订单列表加载中...",
+  loadingDetail: "订单详情加载中...",
   noOrders: "暂无订单。",
   selectHint: "请先选择左侧订单查看详情。",
-  orderCard: "订单",
   orderNo: "订单号",
   orderDetailTitle: "订单详情",
   orderItem: "商品",
@@ -25,12 +26,58 @@ const TEXT = {
   quantity: "数量",
   price: "单价",
   subtotal: "小计",
-  itemCount: "商品数",
+  orderTime: "下单时间",
+  logisticsInfo: "物流信息",
   payNow: "去支付",
   cancelOrder: "取消订单",
   shipNow: "确认发货",
   confirmReceipt: "确认收货"
 };
+
+function formatOrderNo(orderId, createdAt) {
+  const date = createdAt ? new Date(createdAt) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return `ORD-${String(orderId).padStart(6, "0")}`;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}${month}${day}-${String(orderId).padStart(6, "0")}`;
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "暂无";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "暂无";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
+function getLogisticsInfo(status) {
+  switch (status) {
+    case "pending":
+      return "待支付，订单已创建，暂未进入发货流程";
+    case "paid":
+      return "商家待发货，物流单号生成后会展示在这里";
+    case "shipped":
+      return "商品已发货，正在运输中";
+    case "completed":
+      return "订单已完成，物流流程已结束";
+    case "cancelled":
+      return "订单已取消，无物流信息";
+    default:
+      return "暂无物流信息";
+  }
+}
 
 export default function OrderPage() {
   const { user } = useAuth();
@@ -38,7 +85,10 @@ export default function OrderPage() {
   const [orders, setOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [ordersError, setOrdersError] = useState("");
+  const [detailError, setDetailError] = useState("");
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const sellerMode = !!user && ["seller", "admin"].includes(user.role);
 
@@ -50,7 +100,8 @@ export default function OrderPage() {
 
   const loadOrders = async (preferredOrderId) => {
     try {
-      setError("");
+      setOrdersError("");
+      setOrdersLoading(true);
       const data = await fetchOrders({
         scope: sellerMode ? "seller" : "buyer",
         user_id: sellerMode ? undefined : user.userId
@@ -64,17 +115,22 @@ export default function OrderPage() {
         setSelectedOrder(null);
       }
     } catch (err) {
-      setError(getErrorMessage(err, TEXT.loadOrdersFailed));
+      setOrdersError(getErrorMessage(err, TEXT.loadOrdersFailed));
+    } finally {
+      setOrdersLoading(false);
     }
   };
 
   const handleSelect = async (orderId) => {
     try {
-      setError("");
+      setDetailError("");
+      setDetailLoading(true);
       const data = await fetchOrder(orderId);
       setSelectedOrder(data);
     } catch (err) {
-      setError(getErrorMessage(err, TEXT.loadDetailFailed));
+      setDetailError(getErrorMessage(err, TEXT.loadDetailFailed));
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -83,14 +139,14 @@ export default function OrderPage() {
       return;
     }
     try {
-      setError("");
+      setDetailError("");
       setMessage("");
       await updateOrderStatus(selectedOrder.orderId, { status });
       setMessage(TEXT.actionSuccess);
       await handleSelect(selectedOrder.orderId);
       await loadOrders(selectedOrder.orderId);
     } catch (err) {
-      setError(getErrorMessage(err, TEXT.updateFailed));
+      setDetailError(getErrorMessage(err, TEXT.updateFailed));
     }
   };
 
@@ -139,11 +195,12 @@ export default function OrderPage() {
         eyebrow={TEXT.eyebrow}
         title={sellerMode ? TEXT.sellerTitle : TEXT.buyerTitle}
       />
-      {error ? <div className="notice error">{error}</div> : null}
       {message ? <div className="notice success">{message}</div> : null}
 
       <div className="grid-two">
-        <div className="feature-panel">
+        <div className="feature-panel stack-md">
+          {ordersLoading ? <div className="notice">{TEXT.loadingOrders}</div> : null}
+          {ordersError ? <div className="notice error">{ordersError}</div> : null}
           {orders.length ? (
             orders.map((order) => (
               <button
@@ -151,24 +208,25 @@ export default function OrderPage() {
                 className={`order-summary${selectedOrder?.orderId === order.orderId ? " active" : ""}`}
                 onClick={() => handleSelect(order.orderId)}
               >
-                <strong>{`${TEXT.orderCard} #${order.orderId}`}</strong>
-                <span>{`${TEXT.status}: ${ORDER_STATUS_LABELS[order.status] || order.status}`}</span>
-                <span>{`${TEXT.totalPrice}: ${formatCurrency(order.totalPrice)}`}</span>
+                <strong>{formatOrderNo(order.orderId, order.createdAt)}</strong>
+                <span>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
+                <span>{formatCurrency(order.totalPrice)}</span>
               </button>
             ))
-          ) : (
+          ) : ordersLoading ? null : (
             <div className="empty-state">{TEXT.noOrders}</div>
           )}
         </div>
 
-        <div className="feature-panel">
-          {selectedOrder ? (
-            <div className="stack-md">
+        <div className="feature-panel stack-md">
+          {detailLoading ? <div className="notice">{TEXT.loadingDetail}</div> : null}
+          {detailError ? <div className="notice error">{detailError}</div> : null}
+          {!detailLoading && selectedOrder ? (
+            <>
               <h3>{TEXT.orderDetailTitle}</h3>
-              <p>{`${TEXT.orderNo}: #${selectedOrder.orderId}`}</p>
-              <p>{`${TEXT.status}: ${ORDER_STATUS_LABELS[selectedOrder.status] || selectedOrder.status}`}</p>
-              <p>{`${TEXT.itemCount}: ${selectedOrder.items.length}`}</p>
-              <p>{`${TEXT.totalPrice}: ${formatCurrency(selectedOrder.totalPrice)}`}</p>
+              <p>{`${TEXT.orderNo}: ${formatOrderNo(selectedOrder.orderId, selectedOrder.createdAt)}`}</p>
+              <p>{`${TEXT.orderTime}: ${formatDateTime(selectedOrder.createdAt)}`}</p>
+              <p>{`${TEXT.logisticsInfo}: ${getLogisticsInfo(selectedOrder.status)}`}</p>
               {renderActions()}
               <div className="review-list">
                 {selectedOrder.items.map((item) => (
@@ -181,10 +239,12 @@ export default function OrderPage() {
                   </div>
                 ))}
               </div>
-            </div>
-          ) : (
+              <p>{`${TEXT.totalPrice}: ${formatCurrency(selectedOrder.totalPrice)}`}</p>
+            </>
+          ) : null}
+          {!detailLoading && !selectedOrder && !detailError ? (
             <div className="empty-state">{TEXT.selectHint}</div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

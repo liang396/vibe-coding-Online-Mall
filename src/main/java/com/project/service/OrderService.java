@@ -131,7 +131,11 @@ public class OrderService {
         }
 
         return orders.stream()
-                .map(order -> new OrderSummaryResponse(order.getOrderId(), order.getTotalPrice(), order.getStatus()))
+                .map(order -> new OrderSummaryResponse(
+                        order.getOrderId(),
+                        order.getTotalPrice(),
+                        order.getStatus(),
+                        order.getCreatedAt()))
                 .toList();
     }
 
@@ -142,7 +146,13 @@ public class OrderService {
                 .stream()
                 .map(item -> new OrderItemResponse(item.getProductId(), item.getProductName(), item.getQuantity(), item.getPrice()))
                 .toList();
-        return new OrderDetailResponse(order.getOrderId(), order.getBuyerId(), order.getTotalPrice(), order.getStatus(), items);
+        return new OrderDetailResponse(
+                order.getOrderId(),
+                order.getBuyerId(),
+                order.getTotalPrice(),
+                order.getStatus(),
+                order.getCreatedAt(),
+                items);
     }
 
     @Transactional
